@@ -1,1 +1,18 @@
 sasc658
+
+# Build artifacts
+*.o
+*.lnk
+toon-port/toon.000
+toon-port/toon.020
+toon-port/toon.040
+toon-port/toon.060
+toon-port/toon.noopt
+toon-port/test_runner
+release/
+
+# vamos state
+.vamos/
+
+# Legacy test files
+test_hello.*

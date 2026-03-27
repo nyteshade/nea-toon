@@ -1,4 +1,0 @@
-FROM LIB:c.o "work:test_hello.o"
-TO "work:test_hello"
-LIB LIB:sc.lib LIB:amiga.lib
-

@@ -9,15 +9,14 @@ on an Amiga with SAS/C 6.58 (or cross-compile via vamos).
 Usage:
     python3 build_port.py [options]
 
-Options:
-    --toon-repo PATH    Path to toon-format/toon checkout (default: ./toon)
-    --spec-repo PATH    Path to toon-format/spec checkout (default: auto-detect)
-    --output PATH       Output directory (default: ./toon-port)
-    --src PATH          Path to our C sources (default: ./src)
-    --version VER       Override spec version string
-    --with-tests        Generate test runner from spec fixtures
-    --clean             Remove output directory before building
-    -v, --verbose       Verbose output
+    # Generate toon-port/ directory only (for manual Amiga build)
+    python3 build_port.py --clean --with-tests
+
+    # Generate + cross-compile all CPU variants via vamos
+    python3 build_port.py --build
+
+    # Full release: generate, compile 68000/020/040/060, package archive
+    python3 build_port.py --release --with-tests
 
 The script:
     1. Reads the current spec version from the toon/spec repos
@@ -28,6 +27,8 @@ The script:
     6. Optionally generates a C test runner from spec test fixtures
     7. Generates README.md with current spec version
     8. Validates C89 compatibility of all sources
+    9. (--build) Cross-compiles toon.000/.020/.040/.060 via vamos
+   10. (--release) Packages binaries + sources + examples into a .tar.gz
 
 == INSTRUCTIONS FOR FUTURE MAINTENANCE ==
 
@@ -434,37 +435,81 @@ def generate_test_runner(fixtures):
 # Build system generation
 # ---------------------------------------------------------------------------
 
+"""
+CPU build profiles: (name, cpu_flag, optimization_flags, description)
+"""
+CPU_PROFILES = [
+    ("000", "CPU=68000", "OPT STRMER OPTPEEP",
+     "68000 — broadest compatibility, size-optimized"),
+    ("020", "CPU=68020", "OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER",
+     "68020+ — balanced speed optimization"),
+    ("040", "CPU=68040", "OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER",
+     "68040+ — speed-optimized with instruction scheduling"),
+    ("060", "CPU=68060", "OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER",
+     "68060 — speed-optimized with 060 scheduling"),
+]
+
+SOURCE_FILES_C = ['main.c', 'toon_decode.c', 'toon_encode.c',
+                  'json_parse.c', 'json_emit.c', 'toon_util.c']
+OBJS_STR = ' '.join(f.replace('.c', '.o') for f in SOURCE_FILES_C)
+
+
 def generate_smakefile(with_tests=False):
-    """Generate SMakefile for SAS/C."""
-    objs = "main.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o"
+    """Generate SMakefile for SAS/C with multi-CPU targets."""
     test_objs = "test_runner.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o"
 
     lines = [
         "# SMakefile for toon - TOON format CLI for AmigaOS",
         "# SAS/C 6.58",
         "#",
-        "# Usage: smake          (build toon)",
-        "#        smake clean    (remove object files and binary)",
-        f"#        smake test     (build and run test runner)" if with_tests else "",
+        "# Usage: smake              build default (toon.020)",
+        "#        smake all          build all CPU variants",
+        "#        smake toon.000     build 68000 version",
+        "#        smake toon.020     build 68020 version",
+        "#        smake toon.040     build 68040 version",
+        "#        smake toon.060     build 68060 version",
+        "#        smake clean        remove all build artifacts",
+        f"#        smake test         build and run conformance tests" if with_tests else "",
         "#",
-        "# Requires SC: assign pointing to your SAS/C installation,",
-        "# or sc/slink in your command path.",
+        "# Requires SC: assign pointing to your SAS/C installation.",
         "",
         "CC = sc:c/sc",
         "LD = sc:c/slink",
-        "CFLAGS =",
         "LIBS = lib:scnb.lib lib:scmnb.lib lib:amiga.lib",
+        f"OBJS = {OBJS_STR}",
+        "SRCS = " + " ".join(SOURCE_FILES_C),
         "",
-        f"OBJS = {objs}",
+    ]
+
+    # Default target builds 020
+    lines += [
+        "# Default: build 68020 variant",
+        "default: toon.020",
         "",
-        ".c.o:",
-        "\t$(CC) $(CFLAGS) $*.c",
+        "# Build all CPU variants",
+        "all: toon.000 toon.020 toon.040 toon.060",
         "",
-        "all: toon",
-        "",
-        "toon: $(OBJS)",
-        "\t$(LD) lib:c.o $(OBJS) TO toon LIB $(LIBS) NOICONS",
-        "",
+    ]
+
+    # Each CPU variant: compile all .c files with CPU-specific flags, link, clean .o
+    # smake doesn't support per-target CFLAGS, so each target is a full sequence
+    for suffix, cpu_flag, opt_flags, desc in CPU_PROFILES:
+        cflags = f"{cpu_flag} {opt_flags}"
+        lines += [
+            f"# {desc}",
+            f"toon.{suffix}:",
+        ]
+        for src in SOURCE_FILES_C:
+            lines.append(f"\t$(CC) {cflags} {src}")
+        lines += [
+            f"\t$(LD) lib:c.o $(OBJS) TO toon.{suffix} LIB $(LIBS) NOICONS",
+            "\t-delete \\#?.o quiet",
+            "",
+        ]
+
+    # Dependencies (for incremental builds of individual files)
+    lines += [
+        "# Dependencies",
         "main.o: main.c toon.h",
         "toon_decode.o: toon_decode.c toon.h",
         "toon_encode.o: toon_encode.c toon.h",
@@ -476,12 +521,15 @@ def generate_smakefile(with_tests=False):
 
     if with_tests:
         lines += [
-            f"TESTOBJS = {test_objs}",
-            "",
-            "test_runner: $(TESTOBJS)",
-            "\t$(LD) lib:c.o $(TESTOBJS) TO test_runner LIB $(LIBS) NOICONS",
-            "",
-            "test_runner.o: test_runner.c toon.h",
+            "# Test runner (uses 68020 flags)",
+            "test_runner:",
+        ]
+        for src in SOURCE_FILES_C:
+            lines.append(f"\t$(CC) CPU=68020 OPT OPTTIME STRMER {src}")
+        lines += [
+            "\t$(CC) CPU=68020 OPT OPTTIME STRMER test_runner.c",
+            f"\t$(LD) lib:c.o {test_objs} TO test_runner LIB $(LIBS) NOICONS",
+            "\t-delete \\#?.o quiet",
             "",
             "test: test_runner",
             "\ttest_runner",
@@ -491,7 +539,7 @@ def generate_smakefile(with_tests=False):
     lines += [
         "clean:",
         "\t-delete \\#?.o quiet",
-        "\t-delete toon quiet",
+        "\t-delete toon.\\#? quiet",
     ]
 
     if with_tests:
@@ -917,6 +965,295 @@ FALLBACK_EXAMPLES = {
 
 
 # ---------------------------------------------------------------------------
+# Cross-compilation via vamos
+# ---------------------------------------------------------------------------
+
+def find_sasc():
+    """Find the SAS/C installation directory."""
+    # Check $SC environment variable
+    sc = os.environ.get('SC')
+    if sc and os.path.isdir(sc):
+        return sc
+
+    # Common locations
+    for candidate in [
+        os.path.expanduser('~/sasc658'),
+        '/Users/brie/sasc658',
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sasc658'),
+    ]:
+        if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, 'c', 'sc')):
+            return candidate
+
+    return None
+
+
+def vamos_compile(sc_dir, port_dir, source, flags, vamosrc):
+    """Compile a single file via vamos."""
+    import subprocess
+    # Clear RAM
+    ram_dir = os.path.expanduser('~/.vamos/volumes/ram')
+    if os.path.exists(ram_dir):
+        shutil.rmtree(ram_dir)
+
+    cmd = [
+        'vamos',
+        '-c', vamosrc,
+        '-V', f'sc:{sc_dir}',
+        '-V', f'src:{port_dir}',
+        'sc:c/sc', f'src:{source}',
+        'NOSTACKCHECK', 'NOCHKABORT', 'NOICONS', 'IDLEN=80',
+        'IDIR=sc:include',
+    ] + flags + ['OBJNAME=src:']
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    # Check for errors (not warnings)
+    for line in (result.stdout + result.stderr).split('\n'):
+        if 'Error' in line and 'WARNING' not in line:
+            return False, line
+    return True, ""
+
+
+def vamos_link(sc_dir, port_dir, output_name, vamosrc):
+    """Link object files via vamos."""
+    import subprocess
+    ram_dir = os.path.expanduser('~/.vamos/volumes/ram')
+    if os.path.exists(ram_dir):
+        shutil.rmtree(ram_dir)
+
+    objs = [f'src:{o}' for o in OBJS_STR.split()]
+    cmd = [
+        'vamos',
+        '-c', vamosrc,
+        '-V', f'sc:{sc_dir}',
+        '-V', f'src:{port_dir}',
+        'sc:c/slink', 'lib:c.o',
+    ] + objs + [
+        'TO', f'src:{output_name}',
+        'LIB', 'lib:scnb.lib', 'lib:scmnb.lib', 'lib:amiga.lib',
+        'NOICONS',
+    ]
+
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    output = result.stdout + result.stderr
+    # Check for link errors (not Warning 624 which is expected from scnb.lib)
+    for line in output.split('\n'):
+        if 'Error' in line and 'Warning' not in line and 'WARNING' not in line:
+            return False, line
+    return True, ""
+
+
+def cross_compile(port_dir, args):
+    """Cross-compile all CPU variants via vamos."""
+    sc_dir = find_sasc()
+    if not sc_dir:
+        print("Error: SAS/C not found. Set $SC environment variable.", file=sys.stderr)
+        print("  export SC=/path/to/sasc658", file=sys.stderr)
+        sys.exit(1)
+
+    # Check vamos is available
+    import subprocess
+    try:
+        subprocess.run(['vamos', '--help'], capture_output=True, timeout=5)
+    except FileNotFoundError:
+        print("Error: vamos not found. Install with: pip3 install amitools", file=sys.stderr)
+        sys.exit(1)
+
+    vamosrc = os.path.join(port_dir, '.vamosrc')
+    print(f"Cross-compiling via vamos (SAS/C at {sc_dir})...")
+
+    results = {}
+    for suffix, cpu_flag, opt_flags, desc in CPU_PROFILES:
+        print(f"  Building toon.{suffix} ({desc})...")
+
+        # Clean .o files
+        for f in Path(port_dir).glob('*.o'):
+            f.unlink()
+
+        # Compile each source file
+        flags = [cpu_flag] + opt_flags.split()
+        ok = True
+        for src in SOURCE_FILES_C:
+            success, err = vamos_compile(sc_dir, port_dir, src, flags, vamosrc)
+            if not success:
+                print(f"    COMPILE FAILED: {src}: {err}")
+                ok = False
+                break
+
+        if not ok:
+            results[suffix] = None
+            continue
+
+        # Link
+        success, err = vamos_link(sc_dir, port_dir, f'toon.{suffix}', vamosrc)
+        if not success:
+            print(f"    LINK FAILED: {err}")
+            results[suffix] = None
+            continue
+
+        # Get file size
+        binary_path = os.path.join(port_dir, f'toon.{suffix}')
+        if os.path.exists(binary_path):
+            size = os.path.getsize(binary_path)
+            results[suffix] = size
+            print(f"    OK ({size:,} bytes)")
+        else:
+            results[suffix] = None
+            print(f"    FAILED: binary not created")
+
+    # Clean .o files
+    for f in Path(port_dir).glob('*.o'):
+        f.unlink()
+
+    # Summary
+    print()
+    print("Build results:")
+    for suffix, cpu_flag, opt_flags, desc in CPU_PROFILES:
+        size = results.get(suffix)
+        if size:
+            print(f"  toon.{suffix}: {size:>6,} bytes  ({desc.split('—')[0].strip()})")
+        else:
+            print(f"  toon.{suffix}: FAILED")
+
+    if not all(results.values()):
+        print("\nSome builds failed!", file=sys.stderr)
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# Release packaging
+# ---------------------------------------------------------------------------
+
+def package_release(port_dir, spec_version, args):
+    """Package binaries, examples, and docs into a release archive."""
+    release_name = f"toon-{spec_version}-amiga"
+    release_dir = os.path.join(os.path.dirname(port_dir), 'release', release_name)
+
+    print(f"Packaging release: {release_name}")
+
+    # Clean and create release directory
+    if os.path.exists(release_dir):
+        shutil.rmtree(release_dir)
+    os.makedirs(release_dir, exist_ok=True)
+    os.makedirs(os.path.join(release_dir, 'examples'), exist_ok=True)
+    os.makedirs(os.path.join(release_dir, 'src'), exist_ok=True)
+
+    # Copy binaries
+    binaries_copied = 0
+    for suffix, _, _, _ in CPU_PROFILES:
+        binary = os.path.join(port_dir, f'toon.{suffix}')
+        if os.path.exists(binary):
+            shutil.copy2(binary, release_dir)
+            binaries_copied += 1
+
+    if binaries_copied == 0:
+        print("  No binaries found. Run with --build first.", file=sys.stderr)
+        sys.exit(1)
+
+    # Copy examples
+    examples_dir = os.path.join(port_dir, 'examples')
+    if os.path.isdir(examples_dir):
+        for fname in os.listdir(examples_dir):
+            shutil.copy2(
+                os.path.join(examples_dir, fname),
+                os.path.join(release_dir, 'examples', fname)
+            )
+
+    # Copy source files (for users who want to build themselves)
+    for sf in SOURCE_FILES_C + ['toon.h']:
+        src = os.path.join(port_dir, sf)
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(release_dir, 'src', sf))
+
+    # Copy build files
+    for bf in ['SMakefile', 'SCoptions']:
+        src = os.path.join(port_dir, bf)
+        if os.path.exists(src):
+            shutil.copy2(src, os.path.join(release_dir, 'src', bf))
+
+    # Generate release README
+    today = datetime.now().strftime("%Y-%m-%d")
+    readme = textwrap.dedent(f"""\
+        toon {spec_version} for AmigaOS
+        {'=' * (len(f'toon {spec_version} for AmigaOS'))}
+
+        TOON (Token-Oriented Object Notation) CLI tool for AmigaOS.
+        Implements TOON Specification v{spec_version}.
+
+        Binaries
+        --------
+        toon.000    68000 compatible (works on all Amigas)
+        toon.020    68020+ optimized
+        toon.040    68040+ optimized with instruction scheduling
+        toon.060    68060 optimized with instruction scheduling
+
+        Copy the appropriate binary for your CPU to C: and rename to "toon":
+          copy toon.020 C:toon
+
+        Quick Start
+        -----------
+        toon encode data.json           Convert JSON to TOON
+        toon decode data.toon           Convert TOON to JSON
+        toon get data.toon server.host  Read a value
+        toon set data.toon key value    Write a value
+        toon del data.toon key          Delete a value
+
+        Run "toon" with no arguments for full usage information.
+
+        Building from Source
+        --------------------
+        The src/ directory contains complete source code. With SAS/C 6.58:
+          cd src
+          smake all
+
+        This builds all four CPU variants.
+
+        Requirements: AmigaOS 2.x+, 512KB free RAM.
+
+        More Information
+        ----------------
+        TOON spec: https://github.com/toon-format/spec
+        This port: https://github.com/toon-format/nea-toon
+
+        Released {today}
+    """)
+
+    with open(os.path.join(release_dir, 'README'), 'w', newline='\n') as f:
+        f.write(readme)
+
+    # Create tar.gz archive
+    archive_base = os.path.join(os.path.dirname(port_dir), 'release', release_name)
+    archive_path = shutil.make_archive(
+        archive_base, 'gztar',
+        root_dir=os.path.dirname(release_dir),
+        base_dir=release_name
+    )
+
+    # Summary
+    archive_size = os.path.getsize(archive_path)
+    print(f"  Release directory: {release_dir}/")
+    print(f"  Archive: {archive_path} ({archive_size:,} bytes)")
+    print()
+
+    # Print sizes
+    print("  Contents:")
+    for suffix, _, _, desc in CPU_PROFILES:
+        binary = os.path.join(release_dir, f'toon.{suffix}')
+        if os.path.exists(binary):
+            size = os.path.getsize(binary)
+            print(f"    toon.{suffix}: {size:>6,} bytes  {desc.split('—')[0].strip()}")
+
+    n_examples = len(os.listdir(os.path.join(release_dir, 'examples')))
+    n_sources = len(os.listdir(os.path.join(release_dir, 'src')))
+    print(f"    examples/: {n_examples} files")
+    print(f"    src/: {n_sources} files (+ SMakefile, SCoptions)")
+    print(f"    README")
+
+    print()
+    print(f"Ready for GitHub release: {archive_path}")
+    print(f"  gh release create v{spec_version} {archive_path} --title 'toon {spec_version} for AmigaOS'")
+
+
+# ---------------------------------------------------------------------------
 # Main build logic
 # ---------------------------------------------------------------------------
 
@@ -1065,9 +1402,22 @@ def build_port(args):
     print(f"  Examples: {len(examples)}")
     if with_tests:
         print(f"  Test runner: test_runner.c")
-    print()
-    print("To build on Amiga:  smake")
-    print("To build via vamos: vamos -V sc:$SC -V src:$(pwd) --cwd src: -c .vamosrc sc:c/smake")
+
+    # Cross-compile via vamos if requested
+    if args.build or args.release:
+        print()
+        cross_compile(output_dir, args)
+
+    # Package release if requested
+    if args.release:
+        print()
+        package_release(output_dir, spec_version, args)
+
+    if not args.build and not args.release:
+        print()
+        print("To build on Amiga:  smake all")
+        print("To cross-compile:   python3 build_port.py --build")
+        print("To make a release:  python3 build_port.py --release")
 
 
 def main():
@@ -1076,9 +1426,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
             Examples:
-              %(prog)s
-              %(prog)s --toon-repo ../toon --spec-repo ../spec --with-tests
-              %(prog)s --clean --with-tests -v
+              %(prog)s                                    Generate toon-port/ only
+              %(prog)s --build                            Generate + cross-compile all CPU variants
+              %(prog)s --release --with-tests             Full release: generate, compile, package
+              %(prog)s --clean --with-tests -v            Verbose regeneration with tests
         """)
     )
     parser.add_argument('--toon-repo', default='./toon',
@@ -1093,12 +1444,20 @@ def main():
                         help='Override spec version string')
     parser.add_argument('--with-tests', action='store_true',
                         help='Generate test runner from spec fixtures')
+    parser.add_argument('--build', action='store_true',
+                        help='Cross-compile all CPU variants via vamos (requires $SC)')
+    parser.add_argument('--release', action='store_true',
+                        help='Build + package release archive (implies --build)')
     parser.add_argument('--clean', action='store_true',
                         help='Remove output directory before building')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Verbose output')
 
     args = parser.parse_args()
+    # --release implies --build and --clean
+    if args.release:
+        args.build = True
+        args.clean = True
     build_port(args)
 
 

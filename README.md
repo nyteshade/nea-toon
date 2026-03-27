@@ -41,21 +41,33 @@ smake
 ```sh
 git clone --recursive https://github.com/youruser/nea-toon.git
 cd nea-toon
-
-# Generate toon-port/ from sources
-python3 build_port.py --clean --with-tests
-
-# Build via vamos
 export SC=/path/to/sasc658
-cd toon-port
-vamos -V sc:$SC -V src:$(pwd) --cwd src: -c .vamosrc sc:c/smake
 
-# Run
+# Generate toon-port/ + compile all CPU variants
+python3 build_port.py --build --with-tests
+
+# Run a specific variant
 vamos -S -C 68020 -m 8192 -H emu -s 512 \
-  -V sc:$SC -V src:$(pwd) -- src:toon encode src:examples/users.json
+  -V sc:$SC -V src:toon-port -- src:toon.020 encode src:examples/users.json
 ```
 
 Requires [amitools/vamos](https://github.com/cnvogelg/amitools) (`pip3 install amitools`) and a licensed copy of SAS/C 6.58.
+
+### CPU-Specific Binaries
+
+Each build is optimized for its target CPU:
+
+| Binary | Target | Optimization |
+|--------|--------|-------------|
+| `toon.000` | 68000 | Size-optimized (runs on any Amiga) |
+| `toon.020` | 68020+ | Speed-optimized with inlining |
+| `toon.040` | 68040+ | Speed + instruction scheduling |
+| `toon.060` | 68060 | Speed + 060 instruction scheduling |
+
+Copy the appropriate binary to `C:` and rename:
+```
+copy toon.020 C:toon
+```
 
 ## Usage
 
@@ -143,27 +155,37 @@ SAS-C-GUIDE.md         SAS/C 6.58 cross-compilation reference
 
 ## Build System
 
-The `build_port.py` script is the primary build tool. It:
-
-1. Copies C sources from `src/` with C89 compatibility checks
-2. Detects the TOON spec version from the upstream repos
-3. Generates SMakefile, SCoptions, .vamosrc for Amiga builds
-4. Collects examples from the spec repo
-5. Optionally generates `test_runner.c` from spec test fixtures (327 tests)
-6. Generates a README for the toon-port directory
+The `build_port.py` script handles everything from source preparation to release packaging:
 
 ```sh
-# Basic rebuild
-python3 build_port.py --clean
-
-# With conformance test runner
+# Generate toon-port/ directory only (for manual Amiga build)
 python3 build_port.py --clean --with-tests
 
-# With explicit spec repo path
-python3 build_port.py --spec-repo /path/to/toon-format/spec --with-tests
+# Generate + cross-compile all four CPU variants via vamos
+python3 build_port.py --build --with-tests
 
-# Verbose, see all C89 warnings
-python3 build_port.py --clean --with-tests -v
+# Full release: clean build, compile, package .tar.gz for GitHub
+python3 build_port.py --release --with-tests
+
+# With explicit spec repo and verbose C89 checks
+python3 build_port.py --release --with-tests --spec-repo /path/to/spec -v
+```
+
+The `--release` flag produces a `release/toon-X.Y-amiga.tar.gz` archive containing all four binaries, source code, SMakefile, examples, and a README. Upload directly to GitHub Releases:
+
+```sh
+gh release create v3.0 release/toon-3.0-amiga.tar.gz \
+  --title 'toon 3.0 for AmigaOS'
+```
+
+On a real Amiga, `smake all` builds all four CPU variants from source:
+
+```
+smake              Build default (68020)
+smake all          Build toon.000, toon.020, toon.040, toon.060
+smake toon.000     Build 68000 variant only
+smake clean        Remove all build artifacts
+smake test         Build and run conformance tests
 ```
 
 ## TOON Format Quick Reference

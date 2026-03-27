@@ -1,28 +1,74 @@
 # SMakefile for toon - TOON format CLI for AmigaOS
 # SAS/C 6.58
 #
-# Usage: smake          (build toon)
-#        smake clean    (remove object files and binary)
-#        smake test     (build and run test runner)
+# Usage: smake              build default (toon.020)
+#        smake all          build all CPU variants
+#        smake toon.000     build 68000 version
+#        smake toon.020     build 68020 version
+#        smake toon.040     build 68040 version
+#        smake toon.060     build 68060 version
+#        smake clean        remove all build artifacts
+#        smake test         build and run conformance tests
 #
-# Requires SC: assign pointing to your SAS/C installation,
-# or sc/slink in your command path.
+# Requires SC: assign pointing to your SAS/C installation.
 
 CC = sc:c/sc
 LD = sc:c/slink
-CFLAGS =
 LIBS = lib:scnb.lib lib:scmnb.lib lib:amiga.lib
-
 OBJS = main.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
+SRCS = main.c toon_decode.c toon_encode.c json_parse.c json_emit.c toon_util.c
 
-.c.o:
-	$(CC) $(CFLAGS) $*.c
+# Default: build 68020 variant
+default: toon.020
 
-all: toon
+# Build all CPU variants
+all: toon.000 toon.020 toon.040 toon.060
 
-toon: $(OBJS)
-	$(LD) lib:c.o $(OBJS) TO toon LIB $(LIBS) NOICONS
+# 68000 — broadest compatibility, size-optimized
+toon.000:
+	$(CC) CPU=68000 OPT STRMER OPTPEEP main.c
+	$(CC) CPU=68000 OPT STRMER OPTPEEP toon_decode.c
+	$(CC) CPU=68000 OPT STRMER OPTPEEP toon_encode.c
+	$(CC) CPU=68000 OPT STRMER OPTPEEP json_parse.c
+	$(CC) CPU=68000 OPT STRMER OPTPEEP json_emit.c
+	$(CC) CPU=68000 OPT STRMER OPTPEEP toon_util.c
+	$(LD) lib:c.o $(OBJS) TO toon.000 LIB $(LIBS) NOICONS
+	-delete \#?.o quiet
 
+# 68020+ — balanced speed optimization
+toon.020:
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER main.c
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER toon_decode.c
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER toon_encode.c
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER json_parse.c
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER json_emit.c
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER toon_util.c
+	$(LD) lib:c.o $(OBJS) TO toon.020 LIB $(LIBS) NOICONS
+	-delete \#?.o quiet
+
+# 68040+ — speed-optimized with instruction scheduling
+toon.040:
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER main.c
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_decode.c
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_encode.c
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_parse.c
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_emit.c
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_util.c
+	$(LD) lib:c.o $(OBJS) TO toon.040 LIB $(LIBS) NOICONS
+	-delete \#?.o quiet
+
+# 68060 — speed-optimized with 060 scheduling
+toon.060:
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER main.c
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_decode.c
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_encode.c
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_parse.c
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_emit.c
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_util.c
+	$(LD) lib:c.o $(OBJS) TO toon.060 LIB $(LIBS) NOICONS
+	-delete \#?.o quiet
+
+# Dependencies
 main.o: main.c toon.h
 toon_decode.o: toon_decode.c toon.h
 toon_encode.o: toon_encode.c toon.h
@@ -30,17 +76,22 @@ json_parse.o: json_parse.c toon.h
 json_emit.o: json_emit.c toon.h
 toon_util.o: toon_util.c toon.h
 
-TESTOBJS = test_runner.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
-
-test_runner: $(TESTOBJS)
-	$(LD) lib:c.o $(TESTOBJS) TO test_runner LIB $(LIBS) NOICONS
-
-test_runner.o: test_runner.c toon.h
+# Test runner (uses 68020 flags)
+test_runner:
+	$(CC) CPU=68020 OPT OPTTIME STRMER main.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER toon_decode.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER toon_encode.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER json_parse.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER json_emit.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER toon_util.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER test_runner.c
+	$(LD) lib:c.o test_runner.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o TO test_runner LIB $(LIBS) NOICONS
+	-delete \#?.o quiet
 
 test: test_runner
 	test_runner
 
 clean:
 	-delete \#?.o quiet
-	-delete toon quiet
+	-delete toon.\#? quiet
 	-delete test_runner quiet
