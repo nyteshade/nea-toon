@@ -1,0 +1,3 @@
+[submodule "toon"]
+	path = toon
+	url = git@github.com:toon-format/toon.git

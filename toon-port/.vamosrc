@@ -1,0 +1,11 @@
+[vamos]
+cpu = 68020
+ram_size = 8192
+hw_access = emu
+
+[assigns]
+include = sc:include
+lib = sc:lib
+
+[icon.library]
+mode = fake

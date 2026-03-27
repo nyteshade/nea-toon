@@ -1,0 +1,11 @@
+title: My Application
+version: 2.1
+tags[3]: amiga,utility,cli
+features:
+  networking: false
+  scripting: true
+authors[2]:
+  - name: Alice
+    email: alice@example.com
+  - name: Bob
+    email: bob@example.com

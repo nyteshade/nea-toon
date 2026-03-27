@@ -1,0 +1,32 @@
+# SMakefile for toon - TOON format CLI for AmigaOS
+# SAS/C 6.58
+#
+# Usage: smake          (build toon)
+#        smake clean    (remove object files and binary)
+#
+# Requires SC: assign pointing to your SAS/C installation,
+# or sc/slink in your command path.
+
+CC = sc:c/sc
+LD = sc:c/slink
+CFLAGS =
+LIBS = lib:scnb.lib lib:scmnb.lib lib:amiga.lib
+
+OBJS = main.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
+
+.c.o:
+	$(CC) $(CFLAGS) $*.c
+
+toon: $(OBJS)
+	$(LD) lib:cres.o $(OBJS) TO toon LIB $(LIBS) NOICONS
+
+main.o: main.c toon.h
+toon_decode.o: toon_decode.c toon.h
+toon_encode.o: toon_encode.c toon.h
+json_parse.o: json_parse.c toon.h
+json_emit.o: json_emit.c toon.h
+toon_util.o: toon_util.c toon.h
+
+clean:
+	-delete \#?.o quiet
+	-delete toon quiet
