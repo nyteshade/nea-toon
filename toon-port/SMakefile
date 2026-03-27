@@ -3,6 +3,7 @@
 #
 # Usage: smake          (build toon)
 #        smake clean    (remove object files and binary)
+#        smake test     (build and run test runner)
 #
 # Requires SC: assign pointing to your SAS/C installation,
 # or sc/slink in your command path.
@@ -17,8 +18,10 @@ OBJS = main.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
 .c.o:
 	$(CC) $(CFLAGS) $*.c
 
+all: toon
+
 toon: $(OBJS)
-	$(LD) lib:cres.o $(OBJS) TO toon LIB $(LIBS) NOICONS
+	$(LD) lib:c.o $(OBJS) TO toon LIB $(LIBS) NOICONS
 
 main.o: main.c toon.h
 toon_decode.o: toon_decode.c toon.h
@@ -27,6 +30,17 @@ json_parse.o: json_parse.c toon.h
 json_emit.o: json_emit.c toon.h
 toon_util.o: toon_util.c toon.h
 
+TESTOBJS = test_runner.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
+
+test_runner: $(TESTOBJS)
+	$(LD) lib:c.o $(TESTOBJS) TO test_runner LIB $(LIBS) NOICONS
+
+test_runner.o: test_runner.c toon.h
+
+test: test_runner
+	test_runner
+
 clean:
 	-delete \#?.o quiet
 	-delete toon quiet
+	-delete test_runner quiet

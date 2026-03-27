@@ -1,7 +1,0 @@
-products[4]{sku,name,qty,price}:
-  A001,Widget,50,9.99
-  A002,Gadget,25,14.5
-  B001,Doohickey,100,3.25
-  B002,Thingamajig,12,29.99
-warehouse: Building 7
-last_updated: 2026-03-26
