@@ -1,0 +1,64 @@
+* toon.library
+* Function descriptor file for TOON format library v1.0
+* Implements TOON Specification v3.0
+*
+* Register assignments follow Amiga conventions:
+*   Pointers in A0/A1/A2, integers/flags in D0/D1/D2
+*   A6 = library base (implicit)
+*
+##base _ToonBase
+##bias 30
+*
+*------ Core encode/decode (text to text) ------
+*
+ToonEncode(json,indent,delimiter)(A0,D0,D1)
+ToonDecode(toon,indent,strict)(A0,D0,D1)
+*
+*------ Core encode/decode (with JsonValue) ------
+*
+ToonDecodeValue(toon,indent,strict,err)(A0,D0,D1,A1)
+ToonEncodeValue(val,indent,delimiter)(A0,D0,D1)
+*
+*------ Path operations ------
+*
+ToonGet(toon,path,format)(A0,A1,D0)
+ToonSet(toon,path,value)(A0,A1,A2)
+ToonDel(toon,path)(A0,A1)
+*
+*------ JsonValue construction ------
+*
+ToonNewNull()()
+ToonNewBool(val)(D0)
+ToonNewNumber(valptr)(A0)
+ToonNewString(s)(A0)
+ToonNewArray()()
+ToonNewObject()()
+*
+*------ JsonValue manipulation ------
+*
+ToonArrayPush(arr,item)(A0,A1)
+ToonObjectSet(obj,key,val)(A0,A1,A2)
+ToonFreeValue(val)(A0)
+*
+*------ JsonValue query ------
+*
+ToonGetType(val)(A0)
+ToonGetString(val)(A0)
+ToonGetNumber(val,result)(A0,A1)
+ToonGetBool(val)(A0)
+ToonArrayCount(val)(A0)
+ToonArrayItem(val,index)(A0,D0)
+ToonObjectCount(val)(A0)
+ToonObjectKey(val,index)(A0,D0)
+ToonObjectItem(val,index)(A0,D0)
+*
+*------ JSON parse/emit ------
+*
+ToonParseJSON(json,err)(A0,A1)
+ToonEmitJSON(val)(A0)
+*
+*------ Utility ------
+*
+ToonFreeString(s)(A0)
+ToonVersion()()
+##end
