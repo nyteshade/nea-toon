@@ -33,7 +33,8 @@
 typedef enum {
     FMT_AUTO = 0,   /* primitives bare, complex as TOON */
     FMT_JSON,
-    FMT_TOON
+    FMT_TOON,
+    FMT_COUNT       /* -c: print count (array length or object field count) */
 } OutputFmt;
 
 /* ---- Path segment ---- */
@@ -493,6 +494,19 @@ static void print_value(const JsonValue *v, OutputFmt fmt,
         return;
     }
 
+    /* Count mode: print array length or object field count */
+    if (fmt == FMT_COUNT) {
+        if (v->type == JSON_ARRAY)
+            printf("%d\n", v->u.arr.count);
+        else if (v->type == JSON_OBJECT)
+            printf("%d\n", v->u.obj.count);
+        else if (v->type == JSON_STRING)
+            printf("%d\n", (int)strlen(v->u.sval));
+        else
+            printf("1\n");
+        return;
+    }
+
     /* Primitives always print bare regardless of format */
     switch (v->type) {
     case JSON_NULL:
@@ -539,12 +553,12 @@ static void print_value(const JsonValue *v, OutputFmt fmt,
 
 static void print_usage(void)
 {
-    printf("TOON - Token-Oriented Object Notation CLI v1.0\n");
+    printf("TOON - Token-Oriented Object Notation CLI v1.1\n");
     printf("Implements TOON Spec v3.0\n\n");
     printf("Usage:\n");
     printf("  toon encode [opts] [file.json]   JSON to TOON\n");
     printf("  toon decode [opts] [file.toon]   TOON to JSON\n");
-    printf("  toon get [opts] <file> <path>    Get value\n");
+    printf("  toon get [opts] <file> [path]    Get value\n");
     printf("  toon set [opts] <file> <path> <value>  Set value\n");
     printf("  toon del [opts] <file> <path>    Delete value\n\n");
     printf("Options:\n");
@@ -554,13 +568,16 @@ static void print_usage(void)
     printf("  -l         Lenient (non-strict) mode\n");
     printf("  -o <file>  Output file (default stdout)\n");
     printf("  -j         Output as JSON (get command)\n");
-    printf("  -t         Output as TOON (get command, default)\n\n");
+    printf("  -t         Output as TOON (get command, default)\n");
+    printf("  -c         Count mode (array len / object fields)\n\n");
     printf("Path syntax (get/set/del):\n");
     printf("  person.name         Object property\n");
     printf("  users[0].name       Array index + property\n");
     printf("  users.0.name        Alt array index (no brackets)\n");
     printf("  [\"my-key\"].val      Quoted key for special chars\n");
-    printf("  data[\"x.y\"]         Literal dotted key\n");
+    printf("  data[\"x.y\"]         Literal dotted key\n\n");
+    printf("If no path is given, get shows the whole file.\n");
+    printf("set creates the file if it doesn't exist.\n");
 }
 
 /* ---- Main ---- */
@@ -603,6 +620,8 @@ int main(int argc, char *argv[])
             outfmt = FMT_JSON;
         } else if (strcmp(argv[i], "-t") == 0) {
             outfmt = FMT_TOON;
+        } else if (strcmp(argv[i], "-c") == 0) {
+            outfmt = FMT_COUNT;
         } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             outfile = argv[++i];
         } else if (argv[i][0] != '-') {
@@ -699,8 +718,8 @@ int main(int argc, char *argv[])
         const JsonValue *result;
         ToonDecodeOpts opts;
 
-        if (!infile || !getpath) {
-            fprintf(stderr, "Usage: toon get [opts] <file> <path>\n");
+        if (!infile) {
+            fprintf(stderr, "Usage: toon get [opts] <file> [path]\n");
             return 1;
         }
 
@@ -717,6 +736,13 @@ int main(int argc, char *argv[])
         if (!root) {
             fprintf(stderr, "TOON decode error: %s\n", err ? err : "unknown");
             return 1;
+        }
+
+        /* No path: return the whole document */
+        if (!getpath) {
+            print_value(root, outfmt, indent, delim);
+            json_free(root);
+            return 0;
         }
 
         result = json_get_path(root, getpath);
@@ -748,14 +774,14 @@ int main(int argc, char *argv[])
 
         input = toon_read_file(infile);
         if (!input) {
-            fprintf(stderr, "Error: Cannot read %s\n", infile);
-            return 1;
+            /* File doesn't exist - start with empty object */
+            root = json_new_object();
+        } else {
+            dopts.indent = indent;
+            dopts.strict = FALSE;
+            root = toon_decode(input, &dopts, &err);
+            free(input);
         }
-
-        dopts.indent = indent;
-        dopts.strict = FALSE;
-        root = toon_decode(input, &dopts, &err);
-        free(input);
         if (!root) {
             fprintf(stderr, "TOON decode error: %s\n", err ? err : "unknown");
             return 1;

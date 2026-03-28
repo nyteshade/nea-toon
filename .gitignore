@@ -3,6 +3,9 @@ sasc658
 # Build artifacts
 *.o
 *.lnk
+src/toon
+src/lib/toon.library
+src/lib/toon_example
 toon-port/toon.000
 toon-port/toon.020
 toon-port/toon.040
