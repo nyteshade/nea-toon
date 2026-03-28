@@ -1,0 +1,367 @@
+FAIL parses list items whose first field is a tabular array
+  expected: {"items":[{"users":[{"id":1,"name":"Ada"},{"id":2,"name":"Bob"}],"status":"active"}]}
+  got:      {"items":[{"users":[{"id":1,"name":"Ada"},{"id":2,"name":"Bob"}]}]}
+FAIL parses arrays of arrays within objects
+  expected: {"items":[{"matrix":[[1,2],[3,4]],"name":"grid"}]}
+  got:      {"items":[[]]}
+FAIL parses quoted strings and mixed lengths in nested arrays
+  expected: {"pairs":[["a","b"],["c,d","e:f","true"]]}
+  got:      {"pairs":[["a","b"],["c,d","e:f",true,""]]}
+FAIL parses root-level primitive array inline
+  expected: ["x","y","true",true,10]
+  got:      ["x","y",true,true,10]
+FAIL parses single-item array with empty string
+  expected: {"items":[""]}
+  got:      {"items":["",""]}
+FAIL parses whitespace-only strings in arrays
+  expected: {"items":[" ","  "]}
+  got:      {"items":[" ","  ",""]}
+FAIL parses strings with delimiters in arrays
+  expected: {"items":["a","b,c","d:e"]}
+  got:      {"items":["a","b,c","d:e",""]}
+FAIL parses strings that look like primitives when quoted
+  expected: {"items":["x","true","42","-3.14"]}
+  got:      {"items":["x",true,42,-3.14,""]}
+FAIL parses strings with structural tokens in arrays
+  expected: {"items":["[5]","- item","{key}"]}
+  got:      {"items":["[5]","- item","{key}",""]}
+FAIL parses nested arrays inside list items with default comma delimiter
+  expected: {"items":[{"tags":["a","b","c"]}]}
+  got:      {"items":[["a","b","c"]]}
+FAIL parses nested arrays inside list items with default comma delimiter when parent uses pipe
+  expected: {"items":[{"tags":["a","b","c"]}]}
+  got:      {"items":[["a","b","c"]]}
+FAIL parses nested array values containing pipe delimiter
+  expected: {"pairs":[["a","b|c"]]}
+  got:      {"pairs":[["a","b|c",""]]}
+FAIL parses nested array values containing tab delimiter
+  expected: {"pairs":[["a","b\tc"]]}
+  got:      {"pairs":[["a","b\tc",""]]}
+FAIL preserves quoted ambiguity with pipe delimiter
+  expected: {"items":["true","42","-3.14"]}
+  got:      {"items":[true,42,-3.14,""]}
+FAIL preserves quoted ambiguity with tab delimiter
+  expected: {"items":["true","42","-3.14"]}
+  got:      {"items":[true,42,-3.14,""]}
+FAIL parses structural-looking strings when quoted with pipe delimiter
+  expected: {"items":["[5]","{key}","- item"]}
+  got:      {"items":["[5]","{key}","- item",""]}
+FAIL parses structural-looking strings when quoted with tab delimiter
+  expected: {"items":["[5]","{key}","- item"]}
+  got:      {"items":["[5]","{key}","- item",""]}
+FAIL accepts correct indentation with custom indent size (4 spaces with indent=4)
+  expected: {"a":{"b":1}}
+  got:      {"a":{}}
+FAIL accepts tabs in quoted array elements
+  expected: {"items":["a\tb","c\td"]}
+  got:      {"items":["a\tb","c\td",""]}
+FAIL parses very small exponent
+  expected: {"value":1e-10}
+  got:      {"value":0.0000000001}
+FAIL treats extra brackets after valid array segment as literal key
+  expected: {"foo[1][bar]":10}
+  got:      "foo[1][bar]: 10"
+FAIL treats non-integer bracket content as literal key
+  expected: {"foo[bar][1]":20}
+  got:      "foo[bar][1]: 20"
+FAIL treats text between bracket segment and colon as literal key
+  expected: {"foo[2]extra":"a,b"}
+  got:      "foo[2]extra: a,b"
+FAIL expands dotted key to nested object in safe mode
+  expected: {"a":{"b":{"c":1}}}
+  got:      {"a.b.c":1}
+FAIL expands dotted key with inline array
+  expected: {"data":{"meta":{"items":["a","b"]}}}
+  got:      {"data.meta.items":["a","b"]}
+FAIL expands dotted key with tabular array
+  expected: {"a":{"b":{"items":[{"id":1,"name":"A"},{"id":2,"name":"B"}]}}}
+  got:      {"a.b.items":[{"id":1,"name":"A"},{"id":2,"name":"B"}]}
+FAIL expands and deep-merges preserving document-order insertion
+  expected: {"a":{"b":{"c":1,"d":2},"e":3}}
+  got:      {"a.b.c":1,"a.b.d":2,"a.e":3}
+FAIL applies LWW when strict=false (primitive overwrites expanded object)
+  expected: {"a":2}
+  got:      {"a.b":1,"a":2}
+FAIL applies LWW when strict=false (expanded object overwrites primitive)
+  expected: {"a":{"b":2}}
+  got:      {"a":1,"a.b":2}
+FAIL preserves quoted dotted key as literal when expandPaths=safe
+  expected: {"a":{"b":1},"c.d":2}
+  got:      {"a.b":1,"c.d":2}
+FAIL expands keys creating empty nested objects
+  expected: {"a":{"b":{"c":{}}}}
+  got:      {"a.b.c":{}}
+FAIL tolerates spaces around delimiters with quoted values
+  expected: {"items":["a","b","c"]}
+  got:      {"items":["a","b","c",""]}
+FAIL encodes root-level array mixing primitive, object, and array of objects in list format
+  expected: [3]:
+  - summary
+  - id: 1
+    name: Ada
+  - [2]:
+    - id: 2
+    - status: draft
+  got:      [3]:
+  - summary
+  - id: 1
+    name: Ada
+  - [2]:
+    - null
+    - null
+FAIL preserves field order in list items - array first
+  expected: items[1]:
+  - nums[3]: 1,2,3
+    name: Ada
+  got:      items[1]:
+  - nums:
+    [3]: 1,2,3
+    name: Ada
+FAIL preserves field order in list items - primitive first
+  expected: items[1]:
+  - name: Ada
+    nums[3]: 1,2,3
+  got:      items[1]:
+  - name: Ada
+    nums:
+      [3]: 1,2,3
+FAIL uses list format for objects containing arrays of arrays
+  expected: items[1]:
+  - matrix[2]:
+      - [2]: 1,2
+      - [2]: 3,4
+    name: grid
+  got:      items[1]:
+  - matrix:
+    [2]:
+      - [2]: 1,2
+      - [2]: 3,4
+    name: grid
+FAIL uses tabular format for nested uniform object arrays
+  expected: items[1]:
+  - users[2]{id,name}:
+      1,Ada
+      2,Bob
+    status: active
+  got:      items[1]:
+  - users[2]{id,name}:
+      1,Ada
+      2,Bob
+    active
+FAIL uses list format for nested object arrays with mismatched keys
+  expected: items[1]:
+  - users[2]:
+      - id: 1
+        name: Ada
+      - id: 2
+    status: active
+  got:      items[1]:
+  - users:
+    [2]:
+      - id: 1
+        name: Ada
+      - id: 2
+    status: active
+FAIL uses list format for objects with multiple array fields
+  expected: items[1]:
+  - nums[2]: 1,2
+    tags[2]: a,b
+    name: test
+  got:      items[1]:
+  - nums:
+    [2]: 1,2
+    tags:
+      [2]: a,b
+    name: test
+FAIL uses list format for objects with only array fields
+  expected: items[1]:
+  - nums[3]: 1,2,3
+    tags[2]: a,b
+  got:      items[1]:
+  - nums:
+    [3]: 1,2,3
+    tags:
+      [2]: a,b
+FAIL encodes objects with empty arrays in list format
+  expected: items[1]:
+  - name: Ada
+    data[0]:
+  got:      items[1]:
+  - name: Ada
+    data:
+      [0]:
+FAIL uses canonical encoding for multi-field list-item objects with tabular arrays
+  expected: items[1]:
+  - users[2]{id}:
+      1
+      2
+    note: x
+  got:      items[1]:
+  - users[2]{id}:
+      1
+      2
+    x
+FAIL places empty arrays on hyphen line when first
+  expected: items[1]:
+  - data[0]:
+    name: x
+  got:      items[1]:
+  - data:
+    [0]:
+    name: x
+FAIL encodes primitive arrays with tab delimiter
+  expected: tags[3	]: reading	gaming	coding
+  got:      tags[3]: reading,gaming,coding
+FAIL encodes primitive arrays with pipe delimiter
+  expected: tags[3|]: reading|gaming|coding
+  got:      tags[3]: reading,gaming,coding
+FAIL encodes tabular arrays with tab delimiter
+  expected: items[2	]{sku	qty	price}:
+  A1	2	9.99
+  B2	1	14.5
+  got:      items[2]{sku,qty,price}:
+  A1,2,9.99
+  B2,1,14.5
+FAIL encodes tabular arrays with pipe delimiter
+  expected: items[2|]{sku|qty|price}:
+  A1|2|9.99
+  B2|1|14.5
+  got:      items[2]{sku,qty,price}:
+  A1,2,9.99
+  B2,1,14.5
+FAIL encodes nested arrays with tab delimiter
+  expected: pairs[2	]:
+  - [2	]: a	b
+  - [2	]: c	d
+  got:      pairs[2]:
+  - [2]: a,b
+  - [2]: c,d
+FAIL encodes nested arrays with pipe delimiter
+  expected: pairs[2|]:
+  - [2|]: a|b
+  - [2|]: c|d
+  got:      pairs[2]:
+  - [2]: a,b
+  - [2]: c,d
+FAIL encodes root-level array with tab delimiter
+  expected: [3	]: x	y	z
+  got:      [3]: x,y,z
+FAIL encodes root-level array with pipe delimiter
+  expected: [3|]: x|y|z
+  got:      [3]: x,y,z
+FAIL encodes root-level array of objects with tab delimiter
+  expected: [2	]{id}:
+  1
+  2
+  got:      [2]{id}:
+  1
+  2
+FAIL encodes root-level array of objects with pipe delimiter
+  expected: [2|]{id}:
+  1
+  2
+  got:      [2]{id}:
+  1
+  2
+FAIL quotes strings containing tab delimiter
+  expected: items[3	]: a	"b\tc"	d
+  got:      items[3]: a,"b\tc",d
+FAIL quotes strings containing pipe delimiter
+  expected: items[3|]: a|"b|c"|d
+  got:      items[3]: a,b|c,d
+FAIL does not quote commas with tab delimiter
+  expected: items[2	]: a,b	c,d
+  got:      items[2]: "a,b","c,d"
+FAIL does not quote commas with pipe delimiter
+  expected: items[2|]: a,b|c,d
+  got:      items[2]: "a,b","c,d"
+FAIL does not quote commas in tabular values with tab delimiter
+  expected: items[2	]{id	note}:
+  1	a,b
+  2	c,d
+  got:      items[2]{id,note}:
+  1,"a,b"
+  2,"c,d"
+FAIL does not quote commas in object values with pipe delimiter
+  expected: note: a,b
+  got:      note: "a,b"
+FAIL does not quote commas in object values with tab delimiter
+  expected: note: a,b
+  got:      note: "a,b"
+FAIL quotes nested array values containing pipe delimiter
+  expected: pairs[1|]:
+  - [2|]: a|"b|c"
+  got:      pairs[1]:
+  - [2]: a,b|c
+FAIL quotes nested array values containing tab delimiter
+  expected: pairs[1	]:
+  - [2	]: a	"b\tc"
+  got:      pairs[1]:
+  - [2]: a,"b\tc"
+FAIL preserves ambiguity quoting regardless of delimiter
+  expected: items[3|]: "true"|"42"|"-3.14"
+  got:      items[3]: "true","42","-3.14"
+FAIL encodes folded chain to primitive (safe mode)
+  expected: a.b.c: 1
+  got:      a:
+  b:
+    c: 1
+FAIL encodes folded chain with inline array
+  expected: data.meta.items[2]: x,y
+  got:      data:
+  meta:
+    items[2]: x,y
+FAIL encodes folded chain with tabular array
+  expected: a.b.items[2]{id,name}:
+  1,A
+  2,B
+  got:      a:
+  b:
+    items[2]{id,name}:
+      1,A
+      2,B
+FAIL encodes partial folding with flattenDepth=2
+  expected: a.b:
+  c:
+    d: 1
+  got:      a:
+  b:
+    c:
+      d: 1
+FAIL encodes full chain with flattenDepth=Infinity (default)
+  expected: a.b.c.d: 1
+  got:      a:
+  b:
+    c:
+      d: 1
+FAIL encodes folded chain ending with empty object
+  expected: a.b.c:
+  got:      a:
+  b:
+    c:
+FAIL stops folding at array boundary (not single-key object)
+  expected: a.b[2]: 1,2
+  got:      a:
+  b[2]: 1,2
+FAIL encodes folded chains preserving sibling field order
+  expected: first.second.third: 1
+simple: 2
+short.path: 3
+  got:      first:
+  second:
+    third: 1
+simple: 2
+short:
+  path: 3
+FAIL encodes repeating decimal with full precision
+  expected: 0.3333333333333333
+  got:      0.333333333333333
+FAIL respects custom indent size option
+  expected: user:
+    name: Ada
+    role: admin
+  got:      user:
+  name: Ada
+  role: admin
+
+325 tests: 252 passed, 73 failed

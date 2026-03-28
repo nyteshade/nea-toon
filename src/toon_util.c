@@ -242,7 +242,7 @@ void format_number(double val, char *buf, int bufsize)
     intpart = floor(val);
     fracpart = val - intpart;
 
-    if (fracpart < 1e-15 && intpart <= 2147483647.0) {
+    if (fracpart < 1e-17 * (intpart > 1.0 ? intpart : 1.0) && intpart <= 2147483647.0) {
         lval = (long)intpart;
         if (neg) {
             sprintf(buf, "-%ld", lval);
@@ -252,13 +252,16 @@ void format_number(double val, char *buf, int bufsize)
         return;
     }
 
-    /* Floating point: emit integer part + fractional digits manually */
+    /* Floating point: emit integer part + fractional digits manually.
+       IEEE 754 double has ~15.9 significant digits. We use 16 total. */
     {
         char intbuf[32];
-        char fracbuf[20];
+        char fracbuf[24];
         int ipos = 0;
         int fpos = 0;
-        int fdigits = 15; /* max precision */
+        int max_sigfigs = 16;
+        int int_digits;
+        int frac_digits;
         double frac;
         long ipart;
 
@@ -270,7 +273,6 @@ void format_number(double val, char *buf, int bufsize)
             sprintf(intbuf, "%ld", ipart);
             ipos = strlen(intbuf);
         } else {
-            /* Very large number: decompose digit by digit */
             char digits[32];
             int nd = 0;
             double rem = intpart;
@@ -281,21 +283,35 @@ void format_number(double val, char *buf, int bufsize)
                 digits[nd++] = '0' + digit;
                 rem = d;
             }
-            /* digits are reversed */
             for (i = nd - 1; i >= 0; i--)
                 intbuf[ipos++] = digits[i];
         }
         intbuf[ipos] = '\0';
 
-        /* Fractional part - extract digits */
+        /* Count significant digits already used by integer part */
+        int_digits = ipos;
+        if (int_digits == 1 && intbuf[0] == '0')
+            int_digits = 0; /* leading zero doesn't count */
+
+        /* Fractional part - limit to remaining significant digits */
+        frac_digits = max_sigfigs - int_digits;
+        if (frac_digits < 1) frac_digits = 1;
+        if (frac_digits > 20) frac_digits = 20;
+
         frac = fracpart;
-        for (i = 0; i < fdigits && frac > 1e-16; i++) {
+        for (i = 0; i < frac_digits && frac > 0.0; i++) {
             int digit;
             frac *= 10.0;
             digit = (int)frac;
             if (digit > 9) digit = 9;
             fracbuf[fpos++] = '0' + digit;
             frac -= (double)digit;
+            /* Round up if remaining fraction is close to 1 */
+            if (frac > 0.9999999 && i + 1 >= frac_digits) {
+                /* Carry: increment last digit */
+                fracbuf[fpos - 1]++;
+                break;
+            }
         }
         fracbuf[fpos] = '\0';
 

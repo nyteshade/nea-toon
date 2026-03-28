@@ -31,6 +31,12 @@ static void encode_value(Encoder *enc, const JsonValue *v, int depth,
                          toon_bool is_root);
 static void encode_object_fields(Encoder *enc, const JsonValue *obj,
                                  int depth);
+static void emit_list_item_object(Encoder *enc, const JsonValue *item,
+                                   int list_depth, char delim);
+static void emit_object_field(Encoder *enc, const char *key,
+                               const JsonValue *val, int depth, char delim);
+static void emit_list_items(Encoder *enc, const JsonValue *arr,
+                             int depth, char delim);
 
 /* ---- Emit helpers ---- */
 
@@ -39,7 +45,6 @@ static void emit_key(Encoder *enc, const char *key)
     if (toon_valid_unquoted_key(key)) {
         sb_append(&enc->sb, key);
     } else {
-        /* Quoted key */
         const char *p;
         sb_appendc(&enc->sb, '"');
         for (p = key; *p; p++) {
@@ -102,7 +107,6 @@ static void emit_delim_sym(Encoder *enc, char delim)
 {
     if (delim == '\t') sb_appendc(&enc->sb, '\t');
     else if (delim == '|') sb_appendc(&enc->sb, '|');
-    /* comma = no symbol */
 }
 
 /* ---- Array type detection ---- */
@@ -122,7 +126,6 @@ static toon_bool is_all_primitives(const JsonValue *arr)
     return TRUE;
 }
 
-/* Check if array qualifies for tabular format */
 static toon_bool is_tabular_array(const JsonValue *arr)
 {
     int i, j;
@@ -131,7 +134,6 @@ static toon_bool is_tabular_array(const JsonValue *arr)
 
     if (arr->u.arr.count == 0) return FALSE;
 
-    /* All elements must be objects */
     for (i = 0; i < arr->u.arr.count; i++) {
         if (arr->u.arr.items[i]->type != JSON_OBJECT) return FALSE;
     }
@@ -140,7 +142,6 @@ static toon_bool is_tabular_array(const JsonValue *arr)
     fo = &first->u.obj;
     if (fo->count == 0) return FALSE;
 
-    /* All values must be primitives */
     for (i = 0; i < arr->u.arr.count; i++) {
         const JsonObject *o = &arr->u.arr.items[i]->u.obj;
         if (o->count != fo->count) return FALSE;
@@ -149,11 +150,9 @@ static toon_bool is_tabular_array(const JsonValue *arr)
         }
     }
 
-    /* All objects must have same keys */
     for (i = 1; i < arr->u.arr.count; i++) {
         const JsonObject *o = &arr->u.arr.items[i]->u.obj;
         for (j = 0; j < fo->count; j++) {
-            /* Check that each key from first exists in this object */
             toon_bool found = FALSE;
             int k;
             for (k = 0; k < o->count; k++) {
@@ -169,7 +168,6 @@ static toon_bool is_tabular_array(const JsonValue *arr)
     return TRUE;
 }
 
-/* Find value for a key in an object */
 static const JsonValue *obj_find(const JsonValue *obj, const char *key)
 {
     int i;
@@ -180,111 +178,114 @@ static const JsonValue *obj_find(const JsonValue *obj, const char *key)
     return NULL;
 }
 
-/* ---- Array encoding ---- */
+/* ---- Emit array header (bracket segment only, no indent/key) ---- */
 
-static void encode_inline_array(Encoder *enc, const char *key,
-                                const JsonValue *arr, int depth, char delim)
+static void emit_array_header(Encoder *enc, int count, char delim)
 {
-    int i;
     char nbuf[16];
-
-    sb_append_indent(&enc->sb, depth, enc->indent_size);
-    if (key) emit_key(enc, key);
-
     sb_appendc(&enc->sb, '[');
-    sprintf(nbuf, "%d", arr->u.arr.count);
+    sprintf(nbuf, "%d", count);
     sb_append(&enc->sb, nbuf);
     emit_delim_sym(enc, delim);
     sb_appendc(&enc->sb, ']');
-    sb_appendc(&enc->sb, ':');
-
-    if (arr->u.arr.count > 0) {
-        sb_appendc(&enc->sb, ' ');
-        for (i = 0; i < arr->u.arr.count; i++) {
-            if (i > 0) sb_appendc(&enc->sb, delim);
-            emit_primitive(enc, arr->u.arr.items[i], delim);
-        }
-    }
 }
 
-static void encode_tabular_array(Encoder *enc, const char *key,
-                                 const JsonValue *arr, int depth, char delim)
+/* ---- Emit tabular header fields segment ---- */
+
+static void emit_fields_seg(Encoder *enc, const JsonObject *fo, char delim)
 {
-    int i, j;
-    const JsonObject *fo = &arr->u.arr.items[0]->u.obj;
-    char nbuf[16];
-
-    sb_append_indent(&enc->sb, depth, enc->indent_size);
-    if (key) emit_key(enc, key);
-
-    sb_appendc(&enc->sb, '[');
-    sprintf(nbuf, "%d", arr->u.arr.count);
-    sb_append(&enc->sb, nbuf);
-    emit_delim_sym(enc, delim);
-    sb_appendc(&enc->sb, ']');
-
-    /* Fields segment */
+    int i;
     sb_appendc(&enc->sb, '{');
     for (i = 0; i < fo->count; i++) {
         if (i > 0) sb_appendc(&enc->sb, delim);
         emit_key(enc, fo->pairs[i].key);
     }
     sb_appendc(&enc->sb, '}');
-    sb_appendc(&enc->sb, ':');
+}
 
-    /* Rows */
+/* ---- Emit a field's array value inline on a line ---- */
+/* Emits: key[N<delim>]: v1,v2  or  key[N<delim>]{f1,f2}: (with rows below) */
+/* Returns TRUE if rows follow (tabular/list), FALSE if fully inline */
+
+static toon_bool emit_field_array_header(Encoder *enc, const char *key,
+                                         const JsonValue *arr, char delim)
+{
+    if (key) emit_key(enc, key);
+
+    if (arr->u.arr.count == 0) {
+        emit_array_header(enc, 0, delim);
+        sb_appendc(&enc->sb, ':');
+        return FALSE;
+    }
+
+    if (is_all_primitives(arr)) {
+        int i;
+        emit_array_header(enc, arr->u.arr.count, delim);
+        sb_appendc(&enc->sb, ':');
+        sb_appendc(&enc->sb, ' ');
+        for (i = 0; i < arr->u.arr.count; i++) {
+            if (i > 0) sb_appendc(&enc->sb, delim);
+            emit_primitive(enc, arr->u.arr.items[i], delim);
+        }
+        return FALSE;
+    }
+
+    if (is_tabular_array(arr)) {
+        const JsonObject *fo = &arr->u.arr.items[0]->u.obj;
+        emit_array_header(enc, arr->u.arr.count, delim);
+        emit_fields_seg(enc, fo, delim);
+        sb_appendc(&enc->sb, ':');
+        return TRUE; /* rows follow */
+    }
+
+    /* List array */
+    emit_array_header(enc, arr->u.arr.count, delim);
+    sb_appendc(&enc->sb, ':');
+    return TRUE; /* items follow */
+}
+
+/* ---- Emit tabular rows at a given depth ---- */
+
+static void emit_tabular_rows(Encoder *enc, const JsonValue *arr,
+                               int depth, char delim)
+{
+    const JsonObject *fo = &arr->u.arr.items[0]->u.obj;
+    int i, j;
     for (i = 0; i < arr->u.arr.count; i++) {
         sb_appendc(&enc->sb, '\n');
-        sb_append_indent(&enc->sb, depth + 1, enc->indent_size);
+        sb_append_indent(&enc->sb, depth, enc->indent_size);
         for (j = 0; j < fo->count; j++) {
             const JsonValue *val;
             if (j > 0) sb_appendc(&enc->sb, delim);
             val = obj_find(arr->u.arr.items[i], fo->pairs[j].key);
-            if (val) {
-                emit_primitive(enc, val, delim);
-            } else {
-                sb_append(&enc->sb, "null");
-            }
+            if (val) emit_primitive(enc, val, delim);
+            else sb_append(&enc->sb, "null");
         }
     }
 }
 
-static void encode_list_array(Encoder *enc, const char *key,
-                              const JsonValue *arr, int depth, char delim)
+/* ---- Emit list items at a given depth ---- */
+
+static void emit_list_items(Encoder *enc, const JsonValue *arr,
+                             int depth, char delim)
 {
     int i;
     char nbuf[16];
-
-    sb_append_indent(&enc->sb, depth, enc->indent_size);
-    if (key) emit_key(enc, key);
-
-    sb_appendc(&enc->sb, '[');
-    sprintf(nbuf, "%d", arr->u.arr.count);
-    sb_append(&enc->sb, nbuf);
-    emit_delim_sym(enc, delim);
-    sb_appendc(&enc->sb, ']');
-    sb_appendc(&enc->sb, ':');
 
     for (i = 0; i < arr->u.arr.count; i++) {
         const JsonValue *item = arr->u.arr.items[i];
 
         sb_appendc(&enc->sb, '\n');
-        sb_append_indent(&enc->sb, depth + 1, enc->indent_size);
+        sb_append_indent(&enc->sb, depth, enc->indent_size);
 
         if (is_primitive(item)) {
             sb_append(&enc->sb, "- ");
             emit_primitive(enc, item, delim);
         } else if (item->type == JSON_ARRAY) {
-            /* Nested array as list item */
             sb_append(&enc->sb, "- ");
             if (is_all_primitives(item)) {
-                /* Inline */
                 int j;
-                sb_appendc(&enc->sb, '[');
-                sprintf(nbuf, "%d", item->u.arr.count);
-                sb_append(&enc->sb, nbuf);
-                emit_delim_sym(enc, delim);
-                sb_appendc(&enc->sb, ']');
+                emit_array_header(enc, item->u.arr.count, delim);
                 sb_appendc(&enc->sb, ':');
                 if (item->u.arr.count > 0) {
                     sb_appendc(&enc->sb, ' ');
@@ -294,130 +295,125 @@ static void encode_list_array(Encoder *enc, const char *key,
                     }
                 }
             } else {
-                /* Nested list */
-                int j;
-                sb_appendc(&enc->sb, '[');
-                sprintf(nbuf, "%d", item->u.arr.count);
-                sb_append(&enc->sb, nbuf);
-                emit_delim_sym(enc, delim);
-                sb_appendc(&enc->sb, ']');
+                emit_array_header(enc, item->u.arr.count, delim);
                 sb_appendc(&enc->sb, ':');
-                for (j = 0; j < item->u.arr.count; j++) {
-                    sb_appendc(&enc->sb, '\n');
-                    sb_append_indent(&enc->sb, depth + 2, enc->indent_size);
-                    sb_append(&enc->sb, "- ");
-                    if (is_primitive(item->u.arr.items[j])) {
-                        emit_primitive(enc, item->u.arr.items[j], delim);
-                    } else {
-                        /* TODO: deeper nesting */
-                        sb_append(&enc->sb, "null");
-                    }
-                }
+                /* Nested list items */
+                emit_list_items(enc, item, depth + 1, delim);
             }
         } else if (item->type == JSON_OBJECT) {
-            /* Object as list item */
             if (item->u.obj.count == 0) {
                 sb_appendc(&enc->sb, '-');
             } else {
-                int j;
-                const JsonObject *o = &item->u.obj;
-
-                /* Check if first field is tabular array */
-                if (o->count > 0 && o->pairs[0].value->type == JSON_ARRAY &&
-                    is_tabular_array(o->pairs[0].value)) {
-                    /* First field tabular on hyphen line */
-                    const JsonValue *tab = o->pairs[0].value;
-                    const JsonObject *tfo = &tab->u.arr.items[0]->u.obj;
-                    int r, c;
-
-                    sb_append(&enc->sb, "- ");
-                    emit_key(enc, o->pairs[0].key);
-                    sb_appendc(&enc->sb, '[');
-                    sprintf(nbuf, "%d", tab->u.arr.count);
-                    sb_append(&enc->sb, nbuf);
-                    emit_delim_sym(enc, delim);
-                    sb_appendc(&enc->sb, ']');
-                    sb_appendc(&enc->sb, '{');
-                    for (c = 0; c < tfo->count; c++) {
-                        if (c > 0) sb_appendc(&enc->sb, delim);
-                        emit_key(enc, tfo->pairs[c].key);
-                    }
-                    sb_appendc(&enc->sb, '}');
-                    sb_appendc(&enc->sb, ':');
-
-                    /* Tabular rows at depth + 2 */
-                    for (r = 0; r < tab->u.arr.count; r++) {
-                        sb_appendc(&enc->sb, '\n');
-                        sb_append_indent(&enc->sb, depth + 3, enc->indent_size);
-                        for (c = 0; c < tfo->count; c++) {
-                            const JsonValue *cv;
-                            if (c > 0) sb_appendc(&enc->sb, delim);
-                            cv = obj_find(tab->u.arr.items[r],
-                                          tfo->pairs[c].key);
-                            if (cv) emit_primitive(enc, cv, delim);
-                            else sb_append(&enc->sb, "null");
-                        }
-                    }
-
-                    /* Remaining fields at depth + 1 */
-                    for (j = 1; j < o->count; j++) {
-                        sb_appendc(&enc->sb, '\n');
-                        encode_value(enc, o->pairs[j].value, depth + 2, FALSE);
-                    }
-                } else {
-                    /* Normal object: first field on hyphen line */
-                    sb_append(&enc->sb, "- ");
-                    emit_key(enc, o->pairs[0].key);
-                    sb_appendc(&enc->sb, ':');
-
-                    if (is_primitive(o->pairs[0].value)) {
-                        sb_appendc(&enc->sb, ' ');
-                        emit_primitive(enc, o->pairs[0].value, enc->doc_delim);
-                    } else if (o->pairs[0].value->type == JSON_ARRAY) {
-                        /* Array as first field value */
-                        const JsonValue *fa = o->pairs[0].value;
-                        if (is_all_primitives(fa)) {
-                            sb_appendc(&enc->sb, '\n');
-                            encode_value(enc, fa, depth + 2, FALSE);
-                        } else {
-                            sb_appendc(&enc->sb, '\n');
-                            encode_value(enc, fa, depth + 2, FALSE);
-                        }
-                    } else if (o->pairs[0].value->type == JSON_OBJECT) {
-                        /* Nested object */
-                        sb_appendc(&enc->sb, '\n');
-                        encode_object_fields(enc, o->pairs[0].value,
-                                             depth + 2);
-                    }
-
-                    /* Remaining fields at depth+2 (one level under hyphen) */
-                    for (j = 1; j < o->count; j++) {
-                        sb_appendc(&enc->sb, '\n');
-                        sb_append_indent(&enc->sb, depth + 2, enc->indent_size);
-                        emit_key(enc, o->pairs[j].key);
-                        sb_appendc(&enc->sb, ':');
-
-                        if (is_primitive(o->pairs[j].value)) {
-                            sb_appendc(&enc->sb, ' ');
-                            emit_primitive(enc, o->pairs[j].value,
-                                           enc->doc_delim);
-                        } else if (o->pairs[j].value->type == JSON_ARRAY) {
-                            sb_appendc(&enc->sb, '\n');
-                            encode_value(enc, o->pairs[j].value,
-                                         depth + 3, FALSE);
-                        } else if (o->pairs[j].value->type == JSON_OBJECT) {
-                            if (o->pairs[j].value->u.obj.count == 0) {
-                                /* empty */
-                            } else {
-                                sb_appendc(&enc->sb, '\n');
-                                encode_object_fields(enc, o->pairs[j].value,
-                                                     depth + 3);
-                            }
-                        }
-                    }
-                }
+                emit_list_item_object(enc, item, depth, delim);
             }
         }
+    }
+}
+
+/* ---- Emit an object as a list item (Section 10) ---- */
+
+static void emit_list_item_object(Encoder *enc, const JsonValue *item,
+                                   int list_depth, char delim)
+{
+    const JsonObject *o = &item->u.obj;
+    int j;
+    toon_bool first_is_array;
+    toon_bool first_is_tabular;
+
+    first_is_array = (o->pairs[0].value->type == JSON_ARRAY);
+    first_is_tabular = first_is_array && is_tabular_array(o->pairs[0].value);
+
+    /* First field on hyphen line */
+    sb_append(&enc->sb, "- ");
+
+    if (first_is_tabular) {
+        /* Tabular array as first field: header on hyphen line, rows at depth+2 */
+        const JsonValue *tab = o->pairs[0].value;
+        emit_key(enc, o->pairs[0].key);
+        emit_array_header(enc, tab->u.arr.count, delim);
+        emit_fields_seg(enc, &tab->u.arr.items[0]->u.obj, delim);
+        sb_appendc(&enc->sb, ':');
+        emit_tabular_rows(enc, tab, list_depth + 2, delim);
+
+        /* Remaining fields at depth+1 */
+        for (j = 1; j < o->count; j++) {
+            sb_appendc(&enc->sb, '\n');
+            sb_append_indent(&enc->sb, list_depth + 1, enc->indent_size);
+            emit_object_field(enc, o->pairs[j].key, o->pairs[j].value,
+                              list_depth + 1, delim);
+        }
+    } else if (first_is_array) {
+        /* Non-tabular array as first field: inline header on hyphen line */
+        toon_bool has_rows;
+        has_rows = emit_field_array_header(enc, o->pairs[0].key,
+                                            o->pairs[0].value, delim);
+        if (has_rows) {
+            const JsonValue *fa = o->pairs[0].value;
+            if (is_tabular_array(fa)) {
+                emit_tabular_rows(enc, fa, list_depth + 2, delim);
+            } else {
+                emit_list_items(enc, fa, list_depth + 2, delim);
+            }
+        }
+
+        /* Remaining fields at depth+1 */
+        for (j = 1; j < o->count; j++) {
+            sb_appendc(&enc->sb, '\n');
+            sb_append_indent(&enc->sb, list_depth + 1, enc->indent_size);
+            emit_object_field(enc, o->pairs[j].key, o->pairs[j].value,
+                              list_depth + 1, delim);
+        }
+    } else {
+        /* Normal object: first field on hyphen line */
+        emit_key(enc, o->pairs[0].key);
+        sb_appendc(&enc->sb, ':');
+
+        if (is_primitive(o->pairs[0].value)) {
+            sb_appendc(&enc->sb, ' ');
+            emit_primitive(enc, o->pairs[0].value, enc->doc_delim);
+        } else if (o->pairs[0].value->type == JSON_OBJECT) {
+            if (o->pairs[0].value->u.obj.count > 0) {
+                sb_appendc(&enc->sb, '\n');
+                encode_object_fields(enc, o->pairs[0].value, list_depth + 2);
+            }
+        }
+
+        /* Remaining fields at depth+1 (under the hyphen) */
+        for (j = 1; j < o->count; j++) {
+            sb_appendc(&enc->sb, '\n');
+            sb_append_indent(&enc->sb, list_depth + 1, enc->indent_size);
+            emit_object_field(enc, o->pairs[j].key, o->pairs[j].value,
+                              list_depth + 1, delim);
+        }
+    }
+}
+
+/* ---- Emit a single object field (key: value or key[N]: ...) ---- */
+
+static void emit_object_field(Encoder *enc, const char *key,
+                               const JsonValue *val, int depth, char delim)
+{
+    if (val->type == JSON_ARRAY) {
+        toon_bool has_rows = emit_field_array_header(enc, key, val, delim);
+        if (has_rows) {
+            if (is_tabular_array(val)) {
+                emit_tabular_rows(enc, val, depth + 1, delim);
+            } else {
+                emit_list_items(enc, val, depth + 1, delim);
+            }
+        }
+    } else if (val->type == JSON_OBJECT) {
+        emit_key(enc, key);
+        sb_appendc(&enc->sb, ':');
+        if (val->u.obj.count > 0) {
+            sb_appendc(&enc->sb, '\n');
+            encode_object_fields(enc, val, depth + 1);
+        }
+    } else {
+        emit_key(enc, key);
+        sb_appendc(&enc->sb, ':');
+        sb_appendc(&enc->sb, ' ');
+        emit_primitive(enc, val, enc->doc_delim);
     }
 }
 
@@ -429,46 +425,10 @@ static void encode_object_fields(Encoder *enc, const JsonValue *obj, int depth)
     const JsonObject *o = &obj->u.obj;
 
     for (i = 0; i < o->count; i++) {
-        const char *key = o->pairs[i].key;
-        const JsonValue *val = o->pairs[i].value;
-
         if (i > 0) sb_appendc(&enc->sb, '\n');
-
-        if (val->type == JSON_ARRAY) {
-            char delim = enc->doc_delim;
-
-            if (val->u.arr.count == 0) {
-                /* Empty array */
-                sb_append_indent(&enc->sb, depth, enc->indent_size);
-                emit_key(enc, key);
-                sb_appendc(&enc->sb, '[');
-                sb_appendc(&enc->sb, '0');
-                emit_delim_sym(enc, delim);
-                sb_appendc(&enc->sb, ']');
-                sb_appendc(&enc->sb, ':');
-            } else if (is_all_primitives(val)) {
-                encode_inline_array(enc, key, val, depth, delim);
-            } else if (is_tabular_array(val)) {
-                encode_tabular_array(enc, key, val, depth, delim);
-            } else {
-                encode_list_array(enc, key, val, depth, delim);
-            }
-        } else if (val->type == JSON_OBJECT) {
-            sb_append_indent(&enc->sb, depth, enc->indent_size);
-            emit_key(enc, key);
-            sb_appendc(&enc->sb, ':');
-            if (val->u.obj.count > 0) {
-                sb_appendc(&enc->sb, '\n');
-                encode_object_fields(enc, val, depth + 1);
-            }
-        } else {
-            /* Primitive */
-            sb_append_indent(&enc->sb, depth, enc->indent_size);
-            emit_key(enc, key);
-            sb_appendc(&enc->sb, ':');
-            sb_appendc(&enc->sb, ' ');
-            emit_primitive(enc, val, enc->doc_delim);
-        }
+        sb_append_indent(&enc->sb, depth, enc->indent_size);
+        emit_object_field(enc, o->pairs[i].key, o->pairs[i].value,
+                          depth, enc->doc_delim);
     }
 }
 
@@ -486,52 +446,33 @@ static void encode_value(Encoder *enc, const JsonValue *v, int depth,
     case JSON_BOOL:
     case JSON_NUMBER:
     case JSON_STRING:
-        if (is_root) {
-            emit_primitive(enc, v, delim);
-        } else {
-            sb_append_indent(&enc->sb, depth, enc->indent_size);
-            emit_primitive(enc, v, delim);
-        }
+        if (!is_root) sb_append_indent(&enc->sb, depth, enc->indent_size);
+        emit_primitive(enc, v, delim);
         break;
 
     case JSON_ARRAY:
         if (v->u.arr.count == 0) {
-            if (is_root) {
-                sb_append(&enc->sb, "[0]:");
-            } else {
-                sb_append_indent(&enc->sb, depth, enc->indent_size);
-                sb_append(&enc->sb, "[0]:");
-            }
+            if (!is_root) sb_append_indent(&enc->sb, depth, enc->indent_size);
+            emit_array_header(enc, 0, delim);
+            sb_appendc(&enc->sb, ':');
         } else if (is_all_primitives(v)) {
-            if (is_root) {
-                encode_inline_array(enc, NULL, v, 0, delim);
-            } else {
-                encode_inline_array(enc, NULL, v, depth, delim);
-            }
+            if (!is_root) sb_append_indent(&enc->sb, depth, enc->indent_size);
+            emit_field_array_header(enc, NULL, v, delim);
         } else if (is_tabular_array(v)) {
-            if (is_root) {
-                encode_tabular_array(enc, NULL, v, 0, delim);
-            } else {
-                encode_tabular_array(enc, NULL, v, depth, delim);
-            }
+            if (!is_root) sb_append_indent(&enc->sb, depth, enc->indent_size);
+            emit_field_array_header(enc, NULL, v, delim);
+            emit_tabular_rows(enc, v, (is_root ? 0 : depth) + 1, delim);
         } else {
-            if (is_root) {
-                encode_list_array(enc, NULL, v, 0, delim);
-            } else {
-                encode_list_array(enc, NULL, v, depth, delim);
-            }
+            if (!is_root) sb_append_indent(&enc->sb, depth, enc->indent_size);
+            emit_array_header(enc, v->u.arr.count, delim);
+            sb_appendc(&enc->sb, ':');
+            emit_list_items(enc, v, (is_root ? 0 : depth) + 1, delim);
         }
         break;
 
     case JSON_OBJECT:
-        if (v->u.obj.count == 0) {
-            /* Empty object = empty document at root */
-        } else {
-            if (is_root) {
-                encode_object_fields(enc, v, 0);
-            } else {
-                encode_object_fields(enc, v, depth);
-            }
+        if (v->u.obj.count > 0) {
+            encode_object_fields(enc, v, is_root ? 0 : depth);
         }
         break;
     }

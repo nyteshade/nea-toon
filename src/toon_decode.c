@@ -423,29 +423,39 @@ static toon_bool parse_array_header(const char *line, int linelen,
 /* ---- Delimited value splitting ---- */
 
 /* Split a delimited string into tokens. Returns array of strings.
-   Sets *count. Handles quoted values. */
+   Sets *count. Handles quoted values.
+   Quoted tokens are marked by prefixing with \x01 so the caller
+   can distinguish them from unquoted tokens. */
 static char **split_delimited(const char *s, int slen, char delim,
-                              int *count, Decoder *d)
+                              int *count, toon_bool *quoted_flags,
+                              int max_flags, Decoder *d)
 {
     int cap = 8;
     int cnt = 0;
     char **tokens = (char **)calloc(cap, sizeof(char *));
     int pos = 0;
+    toon_bool done = FALSE;
 
-    while (pos <= slen) {
+    while (!done) {
         StrBuf sb;
+        toon_bool is_quoted = FALSE;
         sb_init(&sb);
 
         /* Skip leading whitespace */
         while (pos < slen && s[pos] == ' ') pos++;
 
-        if (pos < slen && s[pos] == '"') {
+        if (pos >= slen) {
+            /* At end - only produce empty token if we got here via trailing delimiter */
+            sb_free(&sb);
+            break;
+        }
+
+        if (s[pos] == '"') {
             /* Quoted value */
             int endq;
             char *qval = parse_quoted(s + pos, &endq, d);
             if (!qval) {
                 sb_free(&sb);
-                /* cleanup */
                 {
                     int i;
                     for (i = 0; i < cnt; i++) free(tokens[i]);
@@ -456,30 +466,37 @@ static char **split_delimited(const char *s, int slen, char delim,
             sb_append(&sb, qval);
             free(qval);
             pos += endq;
+            is_quoted = TRUE;
 
             /* Skip trailing whitespace */
             while (pos < slen && s[pos] == ' ') pos++;
 
             /* Expect delimiter or end */
-            if (pos < slen && s[pos] == delim) pos++;
+            if (pos < slen && s[pos] == delim)
+                pos++;
+            else
+                done = TRUE;
         } else {
             /* Unquoted value - read until delimiter */
             int vstart = pos;
             while (pos < slen && s[pos] != delim) pos++;
             {
                 int vlen = pos - vstart;
-                /* Trim trailing whitespace */
                 while (vlen > 0 && s[vstart + vlen - 1] == ' ') vlen--;
                 sb_appendn(&sb, s + vstart, vlen);
             }
-            if (pos < slen && s[pos] == delim) pos++;
-            else pos = slen + 1; /* end */
+            if (pos < slen && s[pos] == delim)
+                pos++;
+            else
+                done = TRUE;
         }
 
         if (cnt >= cap) {
             cap *= 2;
             tokens = (char **)realloc(tokens, cap * sizeof(char *));
         }
+        if (quoted_flags && cnt < max_flags)
+            quoted_flags[cnt] = is_quoted;
         tokens[cnt++] = sb_detach(&sb);
     }
 
@@ -635,12 +652,15 @@ static JsonValue *decode_inline_primitive_array(const char *vals, int vlen,
 {
     JsonValue *arr = json_new_array();
     char **tokens;
+    toon_bool qflags[256];
     int count = 0;
     int i;
 
+    memset(qflags, 0, sizeof(qflags));
     if (hdr->length == 0) return arr;
 
-    tokens = split_delimited(vals, vlen, hdr->delim, &count, d);
+    tokens = split_delimited(vals, vlen, hdr->delim, &count,
+                             qflags, 256, d);
     if (!tokens) {
         json_free(arr);
         return NULL;
@@ -655,7 +675,12 @@ static JsonValue *decode_inline_primitive_array(const char *vals, int vlen,
     }
 
     for (i = 0; i < count; i++) {
-        JsonValue *item = parse_primitive_token(tokens[i]);
+        JsonValue *item;
+        /* Quoted tokens are always strings, unquoted get type inference */
+        if (i < 256 && qflags[i])
+            item = json_new_string(tokens[i]);
+        else
+            item = parse_primitive_token(tokens[i]);
         json_array_push(arr, item);
         free(tokens[i]);
     }
@@ -686,11 +711,14 @@ static JsonValue *decode_tabular_array(Decoder *d, ArrayHeader *hdr,
         /* Parse row */
         {
             char **tokens;
+            toon_bool qflags[256];
             int count = 0;
             int j;
             JsonValue *row_obj;
 
-            tokens = split_delimited(ln->text, ln->len, hdr->delim, &count, d);
+            memset(qflags, 0, sizeof(qflags));
+            tokens = split_delimited(ln->text, ln->len, hdr->delim, &count,
+                                     qflags, 256, d);
             if (!tokens) {
                 json_free(arr);
                 return NULL;
@@ -706,11 +734,14 @@ static JsonValue *decode_tabular_array(Decoder *d, ArrayHeader *hdr,
 
             row_obj = json_new_object();
             for (j = 0; j < count && j < hdr->nfields; j++) {
-                JsonValue *val = parse_primitive_token(tokens[j]);
+                JsonValue *val;
+                if (j < 256 && qflags[j])
+                    val = json_new_string(tokens[j]);
+                else
+                    val = parse_primitive_token(tokens[j]);
                 json_object_set(row_obj, hdr->fields[j], val);
                 free(tokens[j]);
             }
-            /* Free any excess tokens */
             for (; j < count; j++) free(tokens[j]);
             free(tokens);
 
