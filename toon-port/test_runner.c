@@ -11,14 +11,14 @@ static int tests_passed = 0;
 static int tests_failed = 0;
 
 static void check_decode(const char *name, const char *input,
-                         const char *expected_json)
+                         const char *expected_json, int indent, int strict)
 {
     ToonDecodeOpts opts;
     const char *err = NULL;
     JsonValue *result;
     char *json;
-    opts.indent = 2;
-    opts.strict = 0;
+    opts.indent = indent;
+    opts.strict = strict;
     tests_run++;
     result = toon_decode(input, &opts, &err);
     if (!result) {
@@ -42,7 +42,7 @@ static void check_decode(const char *name, const char *input,
 }
 
 static void check_encode(const char *name, const char *input_json,
-                         const char *expected_toon)
+                         const char *expected_toon, int indent, int delim)
 {
     const char *err = NULL;
     JsonValue *val;
@@ -55,8 +55,8 @@ static void check_encode(const char *name, const char *input_json,
         tests_failed++;
         return;
     }
-    opts.indent = 2;
-    opts.delim = DELIM_COMMA;
+    opts.indent = indent;
+    opts.delim = (ToonDelimiter)delim;
     toon = toon_encode(val, &opts);
     if (strcmp(toon, expected_toon) == 0) {
         tests_passed++;
@@ -72,979 +72,979 @@ int main(void)
 {
     check_decode("parses list arrays for non-uniform objects",
         "items[2]:\n  - id: 1\n    name: First\n  - id: 2\n    name: Second\n    extra: true",
-        "{\"items\":[{\"id\":1,\"name\":\"First\"},{\"id\":2,\"name\":\"Second\",\"extra\":true}]}");
+        "{\"items\":[{\"id\":1,\"name\":\"First\"},{\"id\":2,\"name\":\"Second\",\"extra\":true}]}", 2, 0);
     check_decode("parses list arrays with empty items",
         "items[3]:\n  - first\n  - second\n  -",
-        "{\"items\":[\"first\",\"second\",{}]}");
+        "{\"items\":[\"first\",\"second\",{}]}", 2, 0);
     check_decode("parses list arrays with deeply nested objects",
         "items[2]:\n  - properties:\n      state:\n        type: string\n  - id: 2",
-        "{\"items\":[{\"properties\":{\"state\":{\"type\":\"string\"}}},{\"id\":2}]}");
+        "{\"items\":[{\"properties\":{\"state\":{\"type\":\"string\"}}},{\"id\":2}]}", 2, 0);
     check_decode("parses list arrays containing objects with nested properties",
         "items[1]:\n  - id: 1\n    nested:\n      x: 1",
-        "{\"items\":[{\"id\":1,\"nested\":{\"x\":1}}]}");
+        "{\"items\":[{\"id\":1,\"nested\":{\"x\":1}}]}", 2, 0);
     check_decode("parses list items whose first field is a tabular array",
         "items[1]:\n  - users[2]{id,name}:\n      1,Ada\n      2,Bob\n    status: active",
-        "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}],\"status\":\"active\"}]}");
+        "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}],\"status\":\"active\"}]}", 2, 0);
     check_decode("parses single-field list-item object with tabular array",
         "items[1]:\n  - users[2]{id,name}:\n      1,Ada\n      2,Bob",
-        "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}]}");
+        "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}]}", 2, 0);
     check_decode("parses objects containing arrays (including empty arrays) in list format",
         "items[1]:\n  - name: Ada\n    data[0]:",
-        "{\"items\":[{\"name\":\"Ada\",\"data\":[]}]}");
+        "{\"items\":[{\"name\":\"Ada\",\"data\":[]}]}", 2, 0);
     check_decode("parses arrays of arrays within objects",
         "items[1]:\n  - matrix[2]:\n      - [2]: 1,2\n      - [2]: 3,4\n    name: grid",
-        "{\"items\":[{\"matrix\":[[1,2],[3,4]],\"name\":\"grid\"}]}");
+        "{\"items\":[{\"matrix\":[[1,2],[3,4]],\"name\":\"grid\"}]}", 2, 0);
     check_decode("parses nested arrays of primitives",
         "pairs[2]:\n  - [2]: a,b\n  - [2]: c,d",
-        "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}");
+        "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}", 2, 0);
     check_decode("parses quoted strings and mixed lengths in nested arrays",
         "pairs[2]:\n  - [2]: a,b\n  - [3]: \"c,d\",\"e:f\",\"true\"",
-        "{\"pairs\":[[\"a\",\"b\"],[\"c,d\",\"e:f\",\"true\"]]}");
+        "{\"pairs\":[[\"a\",\"b\"],[\"c,d\",\"e:f\",\"true\"]]}", 2, 0);
     check_decode("parses empty inner arrays",
         "pairs[2]:\n  - [0]:\n  - [0]:",
-        "{\"pairs\":[[],[]]}");
+        "{\"pairs\":[[],[]]}", 2, 0);
     check_decode("parses mixed-length inner arrays",
         "pairs[2]:\n  - [1]: 1\n  - [2]: 2,3",
-        "{\"pairs\":[[1],[2,3]]}");
+        "{\"pairs\":[[1],[2,3]]}", 2, 0);
     check_decode("parses root-level primitive array inline",
         "[5]: x,y,\"true\",true,10",
-        "[\"x\",\"y\",\"true\",true,10]");
+        "[\"x\",\"y\",\"true\",true,10]", 2, 0);
     check_decode("parses root-level array of uniform objects in tabular format",
         "[2]{id}:\n  1\n  2",
-        "[{\"id\":1},{\"id\":2}]");
+        "[{\"id\":1},{\"id\":2}]", 2, 0);
     check_decode("parses root-level array of non-uniform objects in list format",
         "[2]:\n  - id: 1\n  - id: 2\n    name: Ada",
-        "[{\"id\":1},{\"id\":2,\"name\":\"Ada\"}]");
+        "[{\"id\":1},{\"id\":2,\"name\":\"Ada\"}]", 2, 0);
     check_decode("parses root-level array mixing primitive, object, and array of objects in list format",
         "[3]:\n  - summary\n  - id: 1\n    name: Ada\n  - [2]:\n    - id: 2\n    - status: draft",
-        "[\"summary\",{\"id\":1,\"name\":\"Ada\"},[{\"id\":2},{\"status\":\"draft\"}]]");
+        "[\"summary\",{\"id\":1,\"name\":\"Ada\"},[{\"id\":2},{\"status\":\"draft\"}]]", 2, 0);
     check_decode("parses root-level array of arrays",
         "[2]:\n  - [2]: 1,2\n  - [0]:",
-        "[[1,2],[]]");
+        "[[1,2],[]]", 2, 0);
     check_decode("parses empty root-level array",
         "[0]:",
-        "[]");
+        "[]", 2, 0);
     check_decode("parses complex mixed object with arrays and nested objects",
         "user:\n  id: 123\n  name: Ada\n  tags[2]: reading,gaming\n  active: true\n  prefs[0]:",
-        "{\"user\":{\"id\":123,\"name\":\"Ada\",\"tags\":[\"reading\",\"gaming\"],\"active\":true,\"prefs\":[]}}");
+        "{\"user\":{\"id\":123,\"name\":\"Ada\",\"tags\":[\"reading\",\"gaming\"],\"active\":true,\"prefs\":[]}}", 2, 0);
     check_decode("parses arrays mixing primitives, objects, and strings in list format",
         "items[3]:\n  - 1\n  - a: 1\n  - text",
-        "{\"items\":[1,{\"a\":1},\"text\"]}");
+        "{\"items\":[1,{\"a\":1},\"text\"]}", 2, 0);
     check_decode("parses arrays mixing objects and arrays",
         "items[2]:\n  - a: 1\n  - [2]: 1,2",
-        "{\"items\":[{\"a\":1},[1,2]]}");
+        "{\"items\":[{\"a\":1},[1,2]]}", 2, 0);
     check_decode("parses quoted key with list array format",
         "\"x-items\"[2]:\n  - id: 1\n  - id: 2",
-        "{\"x-items\":[{\"id\":1},{\"id\":2}]}");
+        "{\"x-items\":[{\"id\":1},{\"id\":2}]}", 2, 0);
     check_decode("parses string arrays inline",
         "tags[3]: reading,gaming,coding",
-        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}");
+        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}", 2, 0);
     check_decode("parses number arrays inline",
         "nums[3]: 1,2,3",
-        "{\"nums\":[1,2,3]}");
+        "{\"nums\":[1,2,3]}", 2, 0);
     check_decode("parses mixed primitive arrays inline",
         "data[4]: x,y,true,10",
-        "{\"data\":[\"x\",\"y\",true,10]}");
+        "{\"data\":[\"x\",\"y\",true,10]}", 2, 0);
     check_decode("parses empty arrays",
         "items[0]:",
-        "{\"items\":[]}");
+        "{\"items\":[]}", 2, 0);
     check_decode("parses single-item array with empty string",
         "items[1]: \"\"",
-        "{\"items\":[\"\"]}");
+        "{\"items\":[\"\"]}", 2, 0);
     check_decode("parses multi-item array with empty string",
         "items[3]: a,\"\",b",
-        "{\"items\":[\"a\",\"\",\"b\"]}");
+        "{\"items\":[\"a\",\"\",\"b\"]}", 2, 0);
     check_decode("parses whitespace-only strings in arrays",
         "items[2]: \" \",\"  \"",
-        "{\"items\":[\" \",\"  \"]}");
+        "{\"items\":[\" \",\"  \"]}", 2, 0);
     check_decode("parses strings with delimiters in arrays",
         "items[3]: a,\"b,c\",\"d:e\"",
-        "{\"items\":[\"a\",\"b,c\",\"d:e\"]}");
+        "{\"items\":[\"a\",\"b,c\",\"d:e\"]}", 2, 0);
     check_decode("parses strings that look like primitives when quoted",
         "items[4]: x,\"true\",\"42\",\"-3.14\"",
-        "{\"items\":[\"x\",\"true\",\"42\",\"-3.14\"]}");
+        "{\"items\":[\"x\",\"true\",\"42\",\"-3.14\"]}", 2, 0);
     check_decode("parses strings with structural tokens in arrays",
         "items[3]: \"[5]\",\"- item\",\"{key}\"",
-        "{\"items\":[\"[5]\",\"- item\",\"{key}\"]}");
+        "{\"items\":[\"[5]\",\"- item\",\"{key}\"]}", 2, 0);
     check_decode("parses quoted key with inline array",
         "\"my-key\"[3]: 1,2,3",
-        "{\"my-key\":[1,2,3]}");
+        "{\"my-key\":[1,2,3]}", 2, 0);
     check_decode("parses quoted empty string key with inline array",
         "\"\"[3]: 1,2,3",
-        "{\"\":[1,2,3]}");
+        "{\"\":[1,2,3]}", 2, 0);
     check_decode("parses quoted key containing brackets with inline array",
         "\"key[test]\"[3]: 1,2,3",
-        "{\"key[test]\":[1,2,3]}");
+        "{\"key[test]\":[1,2,3]}", 2, 0);
     check_decode("parses quoted key with empty array",
         "\"x-custom\"[0]:",
-        "{\"x-custom\":[]}");
+        "{\"x-custom\":[]}", 2, 0);
     check_decode("parses quoted empty string key with empty array",
         "\"\"[0]:",
-        "{\"\":[]}");
+        "{\"\":[]}", 2, 0);
     check_decode("parses tabular arrays of uniform objects",
         "items[2]{sku,qty,price}:\n  A1,2,9.99\n  B2,1,14.5",
-        "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}");
+        "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}", 2, 0);
     check_decode("parses nulls and quoted values in tabular rows",
         "items[2]{id,value}:\n  1,null\n  2,\"test\"",
-        "{\"items\":[{\"id\":1,\"value\":null},{\"id\":2,\"value\":\"test\"}]}");
+        "{\"items\":[{\"id\":1,\"value\":null},{\"id\":2,\"value\":\"test\"}]}", 2, 0);
     check_decode("parses quoted colon in tabular row as data",
         "items[2]{id,note}:\n  1,\"a:b\"\n  2,\"c:d\"",
-        "{\"items\":[{\"id\":1,\"note\":\"a:b\"},{\"id\":2,\"note\":\"c:d\"}]}");
+        "{\"items\":[{\"id\":1,\"note\":\"a:b\"},{\"id\":2,\"note\":\"c:d\"}]}", 2, 0);
     check_decode("parses quoted header keys in tabular arrays",
         "items[2]{\"order:id\",\"full name\"}:\n  1,Ada\n  2,Bob",
-        "{\"items\":[{\"order:id\":1,\"full name\":\"Ada\"},{\"order:id\":2,\"full name\":\"Bob\"}]}");
+        "{\"items\":[{\"order:id\":1,\"full name\":\"Ada\"},{\"order:id\":2,\"full name\":\"Bob\"}]}", 2, 0);
     check_decode("parses quoted key with tabular array format",
         "\"x-items\"[2]{id,name}:\n  1,Ada\n  2,Bob",
-        "{\"x-items\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}");
+        "{\"x-items\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}", 2, 0);
     check_decode("parses quoted empty string key with tabular array format",
         "\"\"[2]{id,name}:\n  1,Ada\n  2,Bob",
-        "{\"\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}");
+        "{\"\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}", 2, 0);
     check_decode("treats unquoted colon as terminator for tabular rows and start of key-value pair",
         "items[2]{id,name}:\n  1,Alice\n  2,Bob\ncount: 2",
-        "{\"items\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}],\"count\":2}");
+        "{\"items\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}],\"count\":2}", 2, 0);
     check_decode("accepts blank line between root-level fields",
         "a: 1\n\nb: 2",
-        "{\"a\":1,\"b\":2}");
+        "{\"a\":1,\"b\":2}", 2, 1);
     check_decode("accepts trailing newline at end of file",
         "a: 1\n",
-        "{\"a\":1}");
+        "{\"a\":1}", 2, 1);
     check_decode("accepts multiple trailing newlines",
         "a: 1\n\n\n",
-        "{\"a\":1}");
+        "{\"a\":1}", 2, 1);
     check_decode("accepts blank line after array ends",
         "items[1]:\n  - a\n\nb: 2",
-        "{\"items\":[\"a\"],\"b\":2}");
+        "{\"items\":[\"a\"],\"b\":2}", 2, 1);
     check_decode("accepts blank line between nested object fields",
         "a:\n  b: 1\n\n  c: 2",
-        "{\"a\":{\"b\":1,\"c\":2}}");
+        "{\"a\":{\"b\":1,\"c\":2}}", 2, 1);
     check_decode("ignores blank lines inside list array when strict=false",
         "items[3]:\n  - a\n\n  - b\n  - c",
-        "{\"items\":[\"a\",\"b\",\"c\"]}");
+        "{\"items\":[\"a\",\"b\",\"c\"]}", 2, 0);
     check_decode("ignores blank lines inside tabular array when strict=false",
         "items[2]{id,name}:\n  1,Alice\n\n  2,Bob",
-        "{\"items\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}]}");
+        "{\"items\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}]}", 2, 0);
     check_decode("ignores multiple blank lines in arrays when strict=false",
         "items[2]:\n  - a\n\n\n  - b",
-        "{\"items\":[\"a\",\"b\"]}");
+        "{\"items\":[\"a\",\"b\"]}", 2, 0);
     check_decode("parses primitive arrays with tab delimiter",
         "tags[3\t]: reading\tgaming\tcoding",
-        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}");
+        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}", 2, 0);
     check_decode("parses primitive arrays with pipe delimiter",
         "tags[3|]: reading|gaming|coding",
-        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}");
+        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}", 2, 0);
     check_decode("parses primitive arrays with comma delimiter",
         "tags[3]: reading,gaming,coding",
-        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}");
+        "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}", 2, 0);
     check_decode("parses tabular arrays with tab delimiter",
         "items[2\t]{sku\tqty\tprice}:\n  A1\t2\t9.99\n  B2\t1\t14.5",
-        "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}");
+        "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}", 2, 0);
     check_decode("parses tabular arrays with pipe delimiter",
         "items[2|]{sku|qty|price}:\n  A1|2|9.99\n  B2|1|14.5",
-        "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}");
+        "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}", 2, 0);
     check_decode("parses nested arrays with tab delimiter",
         "pairs[2\t]:\n  - [2\t]: a\tb\n  - [2\t]: c\td",
-        "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}");
+        "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}", 2, 0);
     check_decode("parses nested arrays with pipe delimiter",
         "pairs[2|]:\n  - [2|]: a|b\n  - [2|]: c|d",
-        "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}");
+        "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}", 2, 0);
     check_decode("parses nested arrays inside list items with default comma delimiter",
         "items[1\t]:\n  - tags[3]: a,b,c",
-        "{\"items\":[{\"tags\":[\"a\",\"b\",\"c\"]}]}");
+        "{\"items\":[{\"tags\":[\"a\",\"b\",\"c\"]}]}", 2, 0);
     check_decode("parses nested arrays inside list items with default comma delimiter when parent uses pipe",
         "items[1|]:\n  - tags[3]: a,b,c",
-        "{\"items\":[{\"tags\":[\"a\",\"b\",\"c\"]}]}");
+        "{\"items\":[{\"tags\":[\"a\",\"b\",\"c\"]}]}", 2, 0);
     check_decode("parses root-level array with tab delimiter",
         "[3\t]: x\ty\tz",
-        "[\"x\",\"y\",\"z\"]");
+        "[\"x\",\"y\",\"z\"]", 2, 0);
     check_decode("parses root-level array with pipe delimiter",
         "[3|]: x|y|z",
-        "[\"x\",\"y\",\"z\"]");
+        "[\"x\",\"y\",\"z\"]", 2, 0);
     check_decode("parses root-level array of objects with tab delimiter",
         "[2\t]{id}:\n  1\n  2",
-        "[{\"id\":1},{\"id\":2}]");
+        "[{\"id\":1},{\"id\":2}]", 2, 0);
     check_decode("parses root-level array of objects with pipe delimiter",
         "[2|]{id}:\n  1\n  2",
-        "[{\"id\":1},{\"id\":2}]");
+        "[{\"id\":1},{\"id\":2}]", 2, 0);
     check_decode("parses values containing tab delimiter when quoted",
         "items[3\t]: a\t\"b\\tc\"\td",
-        "{\"items\":[\"a\",\"b\\tc\",\"d\"]}");
+        "{\"items\":[\"a\",\"b\\tc\",\"d\"]}", 2, 0);
     check_decode("parses values containing pipe delimiter when quoted",
         "items[3|]: a|\"b|c\"|d",
-        "{\"items\":[\"a\",\"b|c\",\"d\"]}");
+        "{\"items\":[\"a\",\"b|c\",\"d\"]}", 2, 0);
     check_decode("does not split on commas when using tab delimiter",
         "items[2\t]: a,b\tc,d",
-        "{\"items\":[\"a,b\",\"c,d\"]}");
+        "{\"items\":[\"a,b\",\"c,d\"]}", 2, 0);
     check_decode("does not split on commas when using pipe delimiter",
         "items[2|]: a,b|c,d",
-        "{\"items\":[\"a,b\",\"c,d\"]}");
+        "{\"items\":[\"a,b\",\"c,d\"]}", 2, 0);
     check_decode("parses tabular values containing comma with comma delimiter",
         "items[2]{id,note}:\n  1,\"a,b\"\n  2,\"c,d\"",
-        "{\"items\":[{\"id\":1,\"note\":\"a,b\"},{\"id\":2,\"note\":\"c,d\"}]}");
+        "{\"items\":[{\"id\":1,\"note\":\"a,b\"},{\"id\":2,\"note\":\"c,d\"}]}", 2, 0);
     check_decode("does not require quoting commas with tab delimiter",
         "items[2\t]{id\tnote}:\n  1\ta,b\n  2\tc,d",
-        "{\"items\":[{\"id\":1,\"note\":\"a,b\"},{\"id\":2,\"note\":\"c,d\"}]}");
+        "{\"items\":[{\"id\":1,\"note\":\"a,b\"},{\"id\":2,\"note\":\"c,d\"}]}", 2, 0);
     check_decode("does not require quoting commas in object values",
         "note: a,b",
-        "{\"note\":\"a,b\"}");
+        "{\"note\":\"a,b\"}", 2, 0);
     check_decode("object values in list items follow document delimiter",
         "items[2\t]:\n  - status: a,b\n  - status: c,d",
-        "{\"items\":[{\"status\":\"a,b\"},{\"status\":\"c,d\"}]}");
+        "{\"items\":[{\"status\":\"a,b\"},{\"status\":\"c,d\"}]}", 2, 0);
     check_decode("object values with comma must be quoted when document delimiter is comma",
         "items[2]:\n  - status: \"a,b\"\n  - status: \"c,d\"",
-        "{\"items\":[{\"status\":\"a,b\"},{\"status\":\"c,d\"}]}");
+        "{\"items\":[{\"status\":\"a,b\"},{\"status\":\"c,d\"}]}", 2, 0);
     check_decode("parses nested array values containing pipe delimiter",
         "pairs[1|]:\n  - [2|]: a|\"b|c\"",
-        "{\"pairs\":[[\"a\",\"b|c\"]]}");
+        "{\"pairs\":[[\"a\",\"b|c\"]]}", 2, 0);
     check_decode("parses nested array values containing tab delimiter",
         "pairs[1\t]:\n  - [2\t]: a\t\"b\\tc\"",
-        "{\"pairs\":[[\"a\",\"b\\tc\"]]}");
+        "{\"pairs\":[[\"a\",\"b\\tc\"]]}", 2, 0);
     check_decode("preserves quoted ambiguity with pipe delimiter",
         "items[3|]: \"true\"|\"42\"|\"-3.14\"",
-        "{\"items\":[\"true\",\"42\",\"-3.14\"]}");
+        "{\"items\":[\"true\",\"42\",\"-3.14\"]}", 2, 0);
     check_decode("preserves quoted ambiguity with tab delimiter",
         "items[3\t]: \"true\"\t\"42\"\t\"-3.14\"",
-        "{\"items\":[\"true\",\"42\",\"-3.14\"]}");
+        "{\"items\":[\"true\",\"42\",\"-3.14\"]}", 2, 0);
     check_decode("parses structural-looking strings when quoted with pipe delimiter",
         "items[3|]: \"[5]\"|\"{key}\"|\"- item\"",
-        "{\"items\":[\"[5]\",\"{key}\",\"- item\"]}");
+        "{\"items\":[\"[5]\",\"{key}\",\"- item\"]}", 2, 0);
     check_decode("parses structural-looking strings when quoted with tab delimiter",
         "items[3\t]: \"[5]\"\t\"{key}\"\t\"- item\"",
-        "{\"items\":[\"[5]\",\"{key}\",\"- item\"]}");
+        "{\"items\":[\"[5]\",\"{key}\",\"- item\"]}", 2, 0);
     check_decode("parses tabular headers with keys containing the active delimiter",
         "items[2|]{\"a|b\"}:\n  1\n  2",
-        "{\"items\":[{\"a|b\":1},{\"a|b\":2}]}");
+        "{\"items\":[{\"a|b\":1},{\"a|b\":2}]}", 2, 0);
     check_decode("accepts correct indentation with custom indent size (4 spaces with indent=4)",
         "a:\n    b: 1",
-        "{\"a\":{\"b\":1}}");
+        "{\"a\":{\"b\":1}}", 4, 1);
     check_decode("accepts tabs in quoted string values",
         "text: \"hello\tworld\"",
-        "{\"text\":\"hello\\tworld\"}");
+        "{\"text\":\"hello\\tworld\"}", 2, 1);
     check_decode("accepts tabs in quoted keys",
         "\"key\ttab\": value",
-        "{\"key\\ttab\":\"value\"}");
+        "{\"key\\ttab\":\"value\"}", 2, 1);
     check_decode("accepts tabs in quoted array elements",
         "items[2]: \"a\tb\",\"c\td\"",
-        "{\"items\":[\"a\\tb\",\"c\\td\"]}");
+        "{\"items\":[\"a\\tb\",\"c\\td\"]}", 2, 1);
     check_decode("accepts non-multiple indentation when strict=false",
         "a:\n   b: 1",
-        "{\"a\":{\"b\":1}}");
+        "{\"a\":{\"b\":1}}", 2, 0);
     check_decode("accepts deeply nested non-multiples when strict=false",
         "a:\n   b:\n     c: 1",
-        "{\"a\":{\"b\":{\"c\":1}}}");
+        "{\"a\":{\"b\":{\"c\":1}}}", 2, 0);
     check_decode("parses empty lines without validation errors",
         "a: 1\n\nb: 2",
-        "{\"a\":1,\"b\":2}");
+        "{\"a\":1,\"b\":2}", 2, 1);
     check_decode("parses root-level content (0 indentation) as always valid",
         "a: 1\nb: 2\nc: 3",
-        "{\"a\":1,\"b\":2,\"c\":3}");
+        "{\"a\":1,\"b\":2,\"c\":3}", 2, 1);
     check_decode("parses lines with only spaces without validation if empty",
         "a: 1\n   \nb: 2",
-        "{\"a\":1,\"b\":2}");
+        "{\"a\":1,\"b\":2}", 2, 1);
     check_decode("parses number with trailing zeros in fractional part",
         "value: 1.5000",
-        "{\"value\":1.5}");
+        "{\"value\":1.5}", 2, 0);
     check_decode("parses negative number with positive exponent",
         "value: -1E+03",
-        "{\"value\":-1000}");
+        "{\"value\":-1000}", 2, 0);
     check_decode("parses lowercase exponent",
         "value: 2.5e2",
-        "{\"value\":250}");
+        "{\"value\":250}", 2, 0);
     check_decode("parses uppercase exponent with negative sign",
         "value: 3E-02",
-        "{\"value\":0.03}");
+        "{\"value\":0.03}", 2, 0);
     check_decode("parses negative zero as zero",
         "value: -0",
-        "{\"value\":0}");
+        "{\"value\":0}", 2, 0);
     check_decode("parses negative zero with fractional part",
         "value: -0.0",
-        "{\"value\":0}");
+        "{\"value\":0}", 2, 0);
     check_decode("parses array with mixed numeric forms",
         "nums[5]: 42,-1E+03,1.5000,-0,2.5e2",
-        "{\"nums\":[42,-1000,1.5,0,250]}");
+        "{\"nums\":[42,-1000,1.5,0,250]}", 2, 0);
     check_decode("treats leading zero as string not number",
         "value: 05",
-        "{\"value\":\"05\"}");
+        "{\"value\":\"05\"}", 2, 0);
     check_decode("parses very small exponent",
         "value: 1e-10",
-        "{\"value\":1e-10}");
+        "{\"value\":1e-10}", 2, 0);
     check_decode("parses integer with positive exponent",
         "value: 5E+00",
-        "{\"value\":5}");
+        "{\"value\":5}", 2, 0);
     check_decode("parses zero with exponent as number",
         "value: 0e1",
-        "{\"value\":0}");
+        "{\"value\":0}", 2, 0);
     check_decode("parses negative zero with exponent as number",
         "value: -0e1",
-        "{\"value\":0}");
+        "{\"value\":0}", 2, 0);
     check_decode("parses exponent notation",
         "1e6",
-        "1000000");
+        "1000000", 2, 0);
     check_decode("parses exponent notation with uppercase E",
         "1E+6",
-        "1000000");
+        "1000000", 2, 0);
     check_decode("parses negative exponent notation",
         "-1e-3",
-        "-0.001");
+        "-0.001", 2, 0);
     check_decode("treats unquoted leading-zero number as string",
         "05",
-        "\"05\"");
+        "\"05\"", 2, 0);
     check_decode("treats unquoted multi-leading-zero as string",
         "007",
-        "\"007\"");
+        "\"007\"", 2, 0);
     check_decode("treats unquoted octal-like as string",
         "0123",
-        "\"0123\"");
+        "\"0123\"", 2, 0);
     check_decode("treats leading-zero in object value as string",
         "a: 05",
-        "{\"a\":\"05\"}");
+        "{\"a\":\"05\"}", 2, 0);
     check_decode("treats leading-zeros in array as strings",
         "nums[3]: 05,007,0123",
-        "{\"nums\":[\"05\",\"007\",\"0123\"]}");
+        "{\"nums\":[\"05\",\"007\",\"0123\"]}", 2, 0);
     check_decode("treats unquoted negative leading-zero number as string",
         "-05",
-        "\"-05\"");
+        "\"-05\"", 2, 0);
     check_decode("treats negative leading-zeros in array as strings",
         "nums[2]: -05,-007",
-        "{\"nums\":[\"-05\",\"-007\"]}");
+        "{\"nums\":[\"-05\",\"-007\"]}", 2, 0);
     check_decode("parses objects with primitive values",
         "id: 123\nname: Ada\nactive: true",
-        "{\"id\":123,\"name\":\"Ada\",\"active\":true}");
+        "{\"id\":123,\"name\":\"Ada\",\"active\":true}", 2, 0);
     check_decode("parses null values in objects",
         "id: 123\nvalue: null",
-        "{\"id\":123,\"value\":null}");
+        "{\"id\":123,\"value\":null}", 2, 0);
     check_decode("parses empty nested object header",
         "user:",
-        "{\"user\":{}}");
+        "{\"user\":{}}", 2, 0);
     check_decode("parses quoted object value with colon",
         "note: \"a:b\"",
-        "{\"note\":\"a:b\"}");
+        "{\"note\":\"a:b\"}", 2, 0);
     check_decode("parses quoted object value with comma",
         "note: \"a,b\"",
-        "{\"note\":\"a,b\"}");
+        "{\"note\":\"a,b\"}", 2, 0);
     check_decode("parses quoted object value with newline escape",
         "text: \"line1\\nline2\"",
-        "{\"text\":\"line1\\nline2\"}");
+        "{\"text\":\"line1\\nline2\"}", 2, 0);
     check_decode("parses quoted object value with escaped quotes",
         "text: \"say \\\"hello\\\"\"",
-        "{\"text\":\"say \\\"hello\\\"\"}");
+        "{\"text\":\"say \\\"hello\\\"\"}", 2, 0);
     check_decode("parses quoted object value with leading/trailing spaces",
         "text: \" padded \"",
-        "{\"text\":\" padded \"}");
+        "{\"text\":\" padded \"}", 2, 0);
     check_decode("parses quoted object value with only spaces",
         "text: \"  \"",
-        "{\"text\":\"  \"}");
+        "{\"text\":\"  \"}", 2, 0);
     check_decode("parses quoted string value that looks like true",
         "v: \"true\"",
-        "{\"v\":\"true\"}");
+        "{\"v\":\"true\"}", 2, 0);
     check_decode("parses quoted string value that looks like integer",
         "v: \"42\"",
-        "{\"v\":\"42\"}");
+        "{\"v\":\"42\"}", 2, 0);
     check_decode("parses quoted string value that looks like negative decimal",
         "v: \"-7.5\"",
-        "{\"v\":\"-7.5\"}");
+        "{\"v\":\"-7.5\"}", 2, 0);
     check_decode("parses quoted key with colon",
         "\"order:id\": 7",
-        "{\"order:id\":7}");
+        "{\"order:id\":7}", 2, 0);
     check_decode("parses quoted key with brackets",
         "\"[index]\": 5",
-        "{\"[index]\":5}");
+        "{\"[index]\":5}", 2, 0);
     check_decode("treats extra brackets after valid array segment as literal key",
         "foo[1][bar]: 10",
-        "{\"foo[1][bar]\":10}");
+        "{\"foo[1][bar]\":10}", 2, 0);
     check_decode("treats non-integer bracket content as literal key",
         "foo[bar][1]: 20",
-        "{\"foo[bar][1]\":20}");
+        "{\"foo[bar][1]\":20}", 2, 0);
     check_decode("treats text between bracket segment and colon as literal key",
         "foo[2]extra: a,b",
-        "{\"foo[2]extra\":\"a,b\"}");
+        "{\"foo[2]extra\":\"a,b\"}", 2, 0);
     check_decode("parses quoted key with braces",
         "\"{key}\": 5",
-        "{\"{key}\":5}");
+        "{\"{key}\":5}", 2, 0);
     check_decode("parses quoted key with comma",
         "\"a,b\": 1",
-        "{\"a,b\":1}");
+        "{\"a,b\":1}", 2, 0);
     check_decode("parses quoted key with spaces",
         "\"full name\": Ada",
-        "{\"full name\":\"Ada\"}");
+        "{\"full name\":\"Ada\"}", 2, 0);
     check_decode("parses quoted key with leading hyphen",
         "\"-lead\": 1",
-        "{\"-lead\":1}");
+        "{\"-lead\":1}", 2, 0);
     check_decode("parses quoted key with leading and trailing spaces",
         "\" a \": 1",
-        "{\" a \":1}");
+        "{\" a \":1}", 2, 0);
     check_decode("parses quoted numeric key",
         "\"123\": x",
-        "{\"123\":\"x\"}");
+        "{\"123\":\"x\"}", 2, 0);
     check_decode("parses quoted empty string key",
         "\"\": 1",
-        "{\"\":1}");
+        "{\"\":1}", 2, 0);
     check_decode("parses dotted keys as identifiers",
         "user.name: Ada",
-        "{\"user.name\":\"Ada\"}");
+        "{\"user.name\":\"Ada\"}", 2, 0);
     check_decode("parses underscore-prefixed keys",
         "_private: 1",
-        "{\"_private\":1}");
+        "{\"_private\":1}", 2, 0);
     check_decode("parses underscore-containing keys",
         "user_name: 1",
-        "{\"user_name\":1}");
+        "{\"user_name\":1}", 2, 0);
     check_decode("unescapes newline in key",
         "\"line\\nbreak\": 1",
-        "{\"line\\nbreak\":1}");
+        "{\"line\\nbreak\":1}", 2, 0);
     check_decode("unescapes tab in key",
         "\"tab\\there\": 2",
-        "{\"tab\\there\":2}");
+        "{\"tab\\there\":2}", 2, 0);
     check_decode("unescapes quotes in key",
         "\"he said \\\"hi\\\"\": 1",
-        "{\"he said \\\"hi\\\"\":1}");
+        "{\"he said \\\"hi\\\"\":1}", 2, 0);
     check_decode("parses deeply nested objects with indentation",
         "a:\n  b:\n    c: deep",
-        "{\"a\":{\"b\":{\"c\":\"deep\"}}}");
+        "{\"a\":{\"b\":{\"c\":\"deep\"}}}", 2, 0);
     check_decode("expands dotted key to nested object in safe mode",
         "a.b.c: 1",
-        "{\"a\":{\"b\":{\"c\":1}}}");
+        "{\"a\":{\"b\":{\"c\":1}}}", 2, 0);
     check_decode("expands dotted key with inline array",
         "data.meta.items[2]: a,b",
-        "{\"data\":{\"meta\":{\"items\":[\"a\",\"b\"]}}}");
+        "{\"data\":{\"meta\":{\"items\":[\"a\",\"b\"]}}}", 2, 0);
     check_decode("expands dotted key with tabular array",
         "a.b.items[2]{id,name}:\n  1,A\n  2,B",
-        "{\"a\":{\"b\":{\"items\":[{\"id\":1,\"name\":\"A\"},{\"id\":2,\"name\":\"B\"}]}}}");
+        "{\"a\":{\"b\":{\"items\":[{\"id\":1,\"name\":\"A\"},{\"id\":2,\"name\":\"B\"}]}}}", 2, 0);
     check_decode("preserves literal dotted keys when expansion is off",
         "user.name: Ada",
-        "{\"user.name\":\"Ada\"}");
+        "{\"user.name\":\"Ada\"}", 2, 0);
     check_decode("expands and deep-merges preserving document-order insertion",
         "a.b.c: 1\na.b.d: 2\na.e: 3",
-        "{\"a\":{\"b\":{\"c\":1,\"d\":2},\"e\":3}}");
+        "{\"a\":{\"b\":{\"c\":1,\"d\":2},\"e\":3}}", 2, 0);
     check_decode("applies LWW when strict=false (primitive overwrites expanded object)",
         "a.b: 1\na: 2",
-        "{\"a\":2}");
+        "{\"a\":2}", 2, 0);
     check_decode("applies LWW when strict=false (expanded object overwrites primitive)",
         "a: 1\na.b: 2",
-        "{\"a\":{\"b\":2}}");
+        "{\"a\":{\"b\":2}}", 2, 0);
     check_decode("preserves quoted dotted key as literal when expandPaths=safe",
         "a.b: 1\n\"c.d\": 2",
-        "{\"a\":{\"b\":1},\"c.d\":2}");
+        "{\"a\":{\"b\":1},\"c.d\":2}", 2, 0);
     check_decode("preserves non-IdentifierSegment keys as literals",
         "full-name.x: 1",
-        "{\"full-name.x\":1}");
+        "{\"full-name.x\":1}", 2, 0);
     check_decode("expands keys creating empty nested objects",
         "a.b.c:",
-        "{\"a\":{\"b\":{\"c\":{}}}}");
+        "{\"a\":{\"b\":{\"c\":{}}}}", 2, 0);
     check_decode("parses safe unquoted string",
         "hello",
-        "\"hello\"");
+        "\"hello\"", 2, 0);
     check_decode("parses unquoted string with underscore and numbers",
         "Ada_99",
-        "\"Ada_99\"");
+        "\"Ada_99\"", 2, 0);
     check_decode("parses empty quoted string",
         "\"\"",
-        "\"\"");
+        "\"\"", 2, 0);
     check_decode("parses quoted string with newline escape",
         "\"line1\\nline2\"",
-        "\"line1\\nline2\"");
+        "\"line1\\nline2\"", 2, 0);
     check_decode("parses quoted string with tab escape",
         "\"tab\\there\"",
-        "\"tab\\there\"");
+        "\"tab\\there\"", 2, 0);
     check_decode("parses quoted string with carriage return escape",
         "\"return\\rcarriage\"",
-        "\"return\\rcarriage\"");
+        "\"return\\rcarriage\"", 2, 0);
     check_decode("parses quoted string with backslash escape",
         "\"C:\\\\Users\\\\path\"",
-        "\"C:\\\\Users\\\\path\"");
+        "\"C:\\\\Users\\\\path\"", 2, 0);
     check_decode("parses quoted string with escaped quotes",
         "\"say \\\"hello\\\"\"",
-        "\"say \\\"hello\\\"\"");
+        "\"say \\\"hello\\\"\"", 2, 0);
     check_decode("parses positive integer",
         "42",
-        "42");
+        "42", 2, 0);
     check_decode("parses decimal number",
         "3.14",
-        "3.14");
+        "3.14", 2, 0);
     check_decode("parses negative integer",
         "-7",
-        "-7");
+        "-7", 2, 0);
     check_decode("parses true",
         "true",
-        "true");
+        "true", 2, 0);
     check_decode("parses false",
         "false",
-        "false");
+        "false", 2, 0);
     check_decode("respects ambiguity quoting for true",
         "\"true\"",
-        "\"true\"");
+        "\"true\"", 2, 0);
     check_decode("respects ambiguity quoting for false",
         "\"false\"",
-        "\"false\"");
+        "\"false\"", 2, 0);
     check_decode("respects ambiguity quoting for null",
         "\"null\"",
-        "\"null\"");
+        "\"null\"", 2, 0);
     check_decode("respects ambiguity quoting for integer",
         "\"42\"",
-        "\"42\"");
+        "\"42\"", 2, 0);
     check_decode("respects ambiguity quoting for negative decimal",
         "\"-3.14\"",
-        "\"-3.14\"");
+        "\"-3.14\"", 2, 0);
     check_decode("respects ambiguity quoting for scientific notation",
         "\"1e-6\"",
-        "\"1e-6\"");
+        "\"1e-6\"", 2, 0);
     check_decode("respects ambiguity quoting for leading-zero",
         "\"05\"",
-        "\"05\"");
+        "\"05\"", 2, 0);
     check_decode("parses empty document as empty object",
         "",
-        "{}");
+        "{}", 2, 1);
     check_decode("tolerates spaces around commas in inline arrays",
         "tags[3]: a , b , c",
-        "{\"tags\":[\"a\",\"b\",\"c\"]}");
+        "{\"tags\":[\"a\",\"b\",\"c\"]}", 2, 0);
     check_decode("tolerates spaces around pipes in inline arrays",
         "tags[3|]: a | b | c",
-        "{\"tags\":[\"a\",\"b\",\"c\"]}");
+        "{\"tags\":[\"a\",\"b\",\"c\"]}", 2, 0);
     check_decode("tolerates spaces around tabs in inline arrays",
         "tags[3\t]: a \t b \t c",
-        "{\"tags\":[\"a\",\"b\",\"c\"]}");
+        "{\"tags\":[\"a\",\"b\",\"c\"]}", 2, 0);
     check_decode("tolerates leading and trailing spaces in tabular row values",
         "items[2]{id,name}:\n  1 , Alice \n  2 , Bob ",
-        "{\"items\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}]}");
+        "{\"items\":[{\"id\":1,\"name\":\"Alice\"},{\"id\":2,\"name\":\"Bob\"}]}", 2, 0);
     check_decode("tolerates spaces around delimiters with quoted values",
         "items[3]: \"a\" , \"b\" , \"c\"",
-        "{\"items\":[\"a\",\"b\",\"c\"]}");
+        "{\"items\":[\"a\",\"b\",\"c\"]}", 2, 0);
     check_decode("parses empty tokens as empty string",
         "items[3]: a,,c",
-        "{\"items\":[\"a\",\"\",\"c\"]}");
+        "{\"items\":[\"a\",\"\",\"c\"]}", 2, 0);
     check_encode("encodes nested arrays of primitives",
         "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}",
-        "pairs[2]:\n  - [2]: a,b\n  - [2]: c,d");
+        "pairs[2]:\n  - [2]: a,b\n  - [2]: c,d", 2, 0);
     check_encode("quotes strings containing delimiters in nested arrays",
         "{\"pairs\":[[\"a\",\"b\"],[\"c,d\",\"e:f\",\"true\"]]}",
-        "pairs[2]:\n  - [2]: a,b\n  - [3]: \"c,d\",\"e:f\",\"true\"");
+        "pairs[2]:\n  - [2]: a,b\n  - [3]: \"c,d\",\"e:f\",\"true\"", 2, 0);
     check_encode("encodes empty inner arrays",
         "{\"pairs\":[[],[]]}",
-        "pairs[2]:\n  - [0]:\n  - [0]:");
+        "pairs[2]:\n  - [0]:\n  - [0]:", 2, 0);
     check_encode("encodes mixed-length inner arrays",
         "{\"pairs\":[[1],[2,3]]}",
-        "pairs[2]:\n  - [1]: 1\n  - [2]: 2,3");
+        "pairs[2]:\n  - [1]: 1\n  - [2]: 2,3", 2, 0);
     check_encode("encodes root-level primitive array",
         "[\"x\",\"y\",\"true\",true,10]",
-        "[5]: x,y,\"true\",true,10");
+        "[5]: x,y,\"true\",true,10", 2, 0);
     check_encode("encodes root-level array of uniform objects in tabular format",
         "[{\"id\":1},{\"id\":2}]",
-        "[2]{id}:\n  1\n  2");
+        "[2]{id}:\n  1\n  2", 2, 0);
     check_encode("encodes root-level array of non-uniform objects in list format",
         "[{\"id\":1},{\"id\":2,\"name\":\"Ada\"}]",
-        "[2]:\n  - id: 1\n  - id: 2\n    name: Ada");
+        "[2]:\n  - id: 1\n  - id: 2\n    name: Ada", 2, 0);
     check_encode("encodes root-level array mixing primitive, object, and array of objects in list format",
         "[\"summary\",{\"id\":1,\"name\":\"Ada\"},[{\"id\":2},{\"status\":\"draft\"}]]",
-        "[3]:\n  - summary\n  - id: 1\n    name: Ada\n  - [2]:\n    - id: 2\n    - status: draft");
+        "[3]:\n  - summary\n  - id: 1\n    name: Ada\n  - [2]:\n    - id: 2\n    - status: draft", 2, 0);
     check_encode("encodes root-level arrays of arrays",
         "[[1,2],[]]",
-        "[2]:\n  - [2]: 1,2\n  - [0]:");
+        "[2]:\n  - [2]: 1,2\n  - [0]:", 2, 0);
     check_encode("encodes empty root-level array",
         "[]",
-        "[0]:");
+        "[0]:", 2, 0);
     check_encode("encodes complex nested structure",
         "{\"user\":{\"id\":123,\"name\":\"Ada\",\"tags\":[\"reading\",\"gaming\"],\"active\":true,\"prefs\":[]}}",
-        "user:\n  id: 123\n  name: Ada\n  tags[2]: reading,gaming\n  active: true\n  prefs[0]:");
+        "user:\n  id: 123\n  name: Ada\n  tags[2]: reading,gaming\n  active: true\n  prefs[0]:", 2, 0);
     check_encode("uses list format for arrays mixing primitives and objects",
         "{\"items\":[1,{\"a\":1},\"text\"]}",
-        "items[3]:\n  - 1\n  - a: 1\n  - text");
+        "items[3]:\n  - 1\n  - a: 1\n  - text", 2, 0);
     check_encode("uses list format for arrays mixing objects and arrays",
         "{\"items\":[{\"a\":1},[1,2]]}",
-        "items[2]:\n  - a: 1\n  - [2]: 1,2");
+        "items[2]:\n  - a: 1\n  - [2]: 1,2", 2, 0);
     check_encode("uses list format for objects with different fields",
         "{\"items\":[{\"id\":1,\"name\":\"First\"},{\"id\":2,\"name\":\"Second\",\"extra\":true}]}",
-        "items[2]:\n  - id: 1\n    name: First\n  - id: 2\n    name: Second\n    extra: true");
+        "items[2]:\n  - id: 1\n    name: First\n  - id: 2\n    name: Second\n    extra: true", 2, 0);
     check_encode("uses list format for objects with nested values",
         "{\"items\":[{\"id\":1,\"nested\":{\"x\":1}}]}",
-        "items[1]:\n  - id: 1\n    nested:\n      x: 1");
+        "items[1]:\n  - id: 1\n    nested:\n      x: 1", 2, 0);
     check_encode("preserves field order in list items - array first",
         "{\"items\":[{\"nums\":[1,2,3],\"name\":\"Ada\"}]}",
-        "items[1]:\n  - nums[3]: 1,2,3\n    name: Ada");
+        "items[1]:\n  - nums[3]: 1,2,3\n    name: Ada", 2, 0);
     check_encode("preserves field order in list items - primitive first",
         "{\"items\":[{\"name\":\"Ada\",\"nums\":[1,2,3]}]}",
-        "items[1]:\n  - name: Ada\n    nums[3]: 1,2,3");
+        "items[1]:\n  - name: Ada\n    nums[3]: 1,2,3", 2, 0);
     check_encode("uses list format for objects containing arrays of arrays",
         "{\"items\":[{\"matrix\":[[1,2],[3,4]],\"name\":\"grid\"}]}",
-        "items[1]:\n  - matrix[2]:\n      - [2]: 1,2\n      - [2]: 3,4\n    name: grid");
+        "items[1]:\n  - matrix[2]:\n      - [2]: 1,2\n      - [2]: 3,4\n    name: grid", 2, 0);
     check_encode("uses tabular format for nested uniform object arrays",
         "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}],\"status\":\"active\"}]}",
-        "items[1]:\n  - users[2]{id,name}:\n      1,Ada\n      2,Bob\n    status: active");
+        "items[1]:\n  - users[2]{id,name}:\n      1,Ada\n      2,Bob\n    status: active", 2, 0);
     check_encode("uses list format for nested object arrays with mismatched keys",
         "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2}],\"status\":\"active\"}]}",
-        "items[1]:\n  - users[2]:\n      - id: 1\n        name: Ada\n      - id: 2\n    status: active");
+        "items[1]:\n  - users[2]:\n      - id: 1\n        name: Ada\n      - id: 2\n    status: active", 2, 0);
     check_encode("uses list format for objects with multiple array fields",
         "{\"items\":[{\"nums\":[1,2],\"tags\":[\"a\",\"b\"],\"name\":\"test\"}]}",
-        "items[1]:\n  - nums[2]: 1,2\n    tags[2]: a,b\n    name: test");
+        "items[1]:\n  - nums[2]: 1,2\n    tags[2]: a,b\n    name: test", 2, 0);
     check_encode("uses list format for objects with only array fields",
         "{\"items\":[{\"nums\":[1,2,3],\"tags\":[\"a\",\"b\"]}]}",
-        "items[1]:\n  - nums[3]: 1,2,3\n    tags[2]: a,b");
+        "items[1]:\n  - nums[3]: 1,2,3\n    tags[2]: a,b", 2, 0);
     check_encode("encodes objects with empty arrays in list format",
         "{\"items\":[{\"name\":\"Ada\",\"data\":[]}]}",
-        "items[1]:\n  - name: Ada\n    data[0]:");
+        "items[1]:\n  - name: Ada\n    data[0]:", 2, 0);
     check_encode("uses canonical encoding for multi-field list-item objects with tabular arrays",
         "{\"items\":[{\"users\":[{\"id\":1},{\"id\":2}],\"note\":\"x\"}]}",
-        "items[1]:\n  - users[2]{id}:\n      1\n      2\n    note: x");
+        "items[1]:\n  - users[2]{id}:\n      1\n      2\n    note: x", 2, 0);
     check_encode("uses canonical encoding for single-field list-item tabular arrays",
         "{\"items\":[{\"users\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}]}",
-        "items[1]:\n  - users[2]{id,name}:\n      1,Ada\n      2,Bob");
+        "items[1]:\n  - users[2]{id,name}:\n      1,Ada\n      2,Bob", 2, 0);
     check_encode("places empty arrays on hyphen line when first",
         "{\"items\":[{\"data\":[],\"name\":\"x\"}]}",
-        "items[1]:\n  - data[0]:\n    name: x");
+        "items[1]:\n  - data[0]:\n    name: x", 2, 0);
     check_encode("encodes empty object list items as bare hyphen",
         "{\"items\":[\"first\",\"second\",{}]}",
-        "items[3]:\n  - first\n  - second\n  -");
+        "items[3]:\n  - first\n  - second\n  -", 2, 0);
     check_encode("uses field order from first object for tabular headers",
         "{\"items\":[{\"a\":1,\"b\":2,\"c\":3},{\"c\":30,\"b\":20,\"a\":10}]}",
-        "items[2]{a,b,c}:\n  1,2,3\n  10,20,30");
+        "items[2]{a,b,c}:\n  1,2,3\n  10,20,30", 2, 0);
     check_encode("uses list format when one object has nested field",
         "{\"items\":[{\"id\":1,\"data\":\"string\"},{\"id\":2,\"data\":{\"nested\":true}}]}",
-        "items[2]:\n  - id: 1\n    data: string\n  - id: 2\n    data:\n      nested: true");
+        "items[2]:\n  - id: 1\n    data: string\n  - id: 2\n    data:\n      nested: true", 2, 0);
     check_encode("encodes string arrays inline",
         "{\"tags\":[\"reading\",\"gaming\"]}",
-        "tags[2]: reading,gaming");
+        "tags[2]: reading,gaming", 2, 0);
     check_encode("encodes number arrays inline",
         "{\"nums\":[1,2,3]}",
-        "nums[3]: 1,2,3");
+        "nums[3]: 1,2,3", 2, 0);
     check_encode("encodes mixed primitive arrays inline",
         "{\"data\":[\"x\",\"y\",true,10]}",
-        "data[4]: x,y,true,10");
+        "data[4]: x,y,true,10", 2, 0);
     check_encode("encodes empty arrays",
         "{\"items\":[]}",
-        "items[0]:");
+        "items[0]:", 2, 0);
     check_encode("encodes empty string keys for inline arrays",
         "{\"\":[1,2,3]}",
-        "\"\"[3]: 1,2,3");
+        "\"\"[3]: 1,2,3", 2, 0);
     check_encode("encodes empty string keys for empty arrays",
         "{\"\":[]}",
-        "\"\"[0]:");
+        "\"\"[0]:", 2, 0);
     check_encode("encodes empty string in single-item array",
         "{\"items\":[\"\"]}",
-        "items[1]: \"\"");
+        "items[1]: \"\"", 2, 0);
     check_encode("encodes empty string in multi-item array",
         "{\"items\":[\"a\",\"\",\"b\"]}",
-        "items[3]: a,\"\",b");
+        "items[3]: a,\"\",b", 2, 0);
     check_encode("encodes whitespace-only strings in arrays",
         "{\"items\":[\" \",\"  \"]}",
-        "items[2]: \" \",\"  \"");
+        "items[2]: \" \",\"  \"", 2, 0);
     check_encode("quotes array strings with comma",
         "{\"items\":[\"a\",\"b,c\",\"d:e\"]}",
-        "items[3]: a,\"b,c\",\"d:e\"");
+        "items[3]: a,\"b,c\",\"d:e\"", 2, 0);
     check_encode("quotes strings that look like booleans in arrays",
         "{\"items\":[\"x\",\"true\",\"42\",\"-3.14\"]}",
-        "items[4]: x,\"true\",\"42\",\"-3.14\"");
+        "items[4]: x,\"true\",\"42\",\"-3.14\"", 2, 0);
     check_encode("quotes strings with structural meanings in arrays",
         "{\"items\":[\"[5]\",\"- item\",\"{key}\"]}",
-        "items[3]: \"[5]\",\"- item\",\"{key}\"");
+        "items[3]: \"[5]\",\"- item\",\"{key}\"", 2, 0);
     check_encode("encodes arrays of uniform objects in tabular format",
         "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}",
-        "items[2]{sku,qty,price}:\n  A1,2,9.99\n  B2,1,14.5");
+        "items[2]{sku,qty,price}:\n  A1,2,9.99\n  B2,1,14.5", 2, 0);
     check_encode("encodes null values in tabular format",
         "{\"items\":[{\"id\":1,\"value\":null},{\"id\":2,\"value\":\"test\"}]}",
-        "items[2]{id,value}:\n  1,null\n  2,test");
+        "items[2]{id,value}:\n  1,null\n  2,test", 2, 0);
     check_encode("quotes strings containing delimiters in tabular rows",
         "{\"items\":[{\"sku\":\"A,1\",\"desc\":\"cool\",\"qty\":2},{\"sku\":\"B2\",\"desc\":\"wip: test\",\"qty\":1}]}",
-        "items[2]{sku,desc,qty}:\n  \"A,1\",cool,2\n  B2,\"wip: test\",1");
+        "items[2]{sku,desc,qty}:\n  \"A,1\",cool,2\n  B2,\"wip: test\",1", 2, 0);
     check_encode("quotes ambiguous strings in tabular rows",
         "{\"items\":[{\"id\":1,\"status\":\"true\"},{\"id\":2,\"status\":\"false\"}]}",
-        "items[2]{id,status}:\n  1,\"true\"\n  2,\"false\"");
+        "items[2]{id,status}:\n  1,\"true\"\n  2,\"false\"", 2, 0);
     check_encode("encodes tabular arrays with keys needing quotes",
         "{\"items\":[{\"order:id\":1,\"full name\":\"Ada\"},{\"order:id\":2,\"full name\":\"Bob\"}]}",
-        "items[2]{\"order:id\",\"full name\"}:\n  1,Ada\n  2,Bob");
+        "items[2]{\"order:id\",\"full name\"}:\n  1,Ada\n  2,Bob", 2, 0);
     check_encode("encodes tabular arrays with empty string keys",
         "{\"\":[{\"id\":1,\"name\":\"Ada\"},{\"id\":2,\"name\":\"Bob\"}]}",
-        "\"\"[2]{id,name}:\n  1,Ada\n  2,Bob");
+        "\"\"[2]{id,name}:\n  1,Ada\n  2,Bob", 2, 0);
     check_encode("encodes primitive arrays with tab delimiter",
         "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}",
-        "tags[3\t]: reading\tgaming\tcoding");
+        "tags[3\t]: reading\tgaming\tcoding", 2, 1);
     check_encode("encodes primitive arrays with pipe delimiter",
         "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}",
-        "tags[3|]: reading|gaming|coding");
+        "tags[3|]: reading|gaming|coding", 2, 2);
     check_encode("encodes primitive arrays with comma delimiter",
         "{\"tags\":[\"reading\",\"gaming\",\"coding\"]}",
-        "tags[3]: reading,gaming,coding");
+        "tags[3]: reading,gaming,coding", 2, 0);
     check_encode("encodes tabular arrays with tab delimiter",
         "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}",
-        "items[2\t]{sku\tqty\tprice}:\n  A1\t2\t9.99\n  B2\t1\t14.5");
+        "items[2\t]{sku\tqty\tprice}:\n  A1\t2\t9.99\n  B2\t1\t14.5", 2, 1);
     check_encode("encodes tabular arrays with pipe delimiter",
         "{\"items\":[{\"sku\":\"A1\",\"qty\":2,\"price\":9.99},{\"sku\":\"B2\",\"qty\":1,\"price\":14.5}]}",
-        "items[2|]{sku|qty|price}:\n  A1|2|9.99\n  B2|1|14.5");
+        "items[2|]{sku|qty|price}:\n  A1|2|9.99\n  B2|1|14.5", 2, 2);
     check_encode("encodes nested arrays with tab delimiter",
         "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}",
-        "pairs[2\t]:\n  - [2\t]: a\tb\n  - [2\t]: c\td");
+        "pairs[2\t]:\n  - [2\t]: a\tb\n  - [2\t]: c\td", 2, 1);
     check_encode("encodes nested arrays with pipe delimiter",
         "{\"pairs\":[[\"a\",\"b\"],[\"c\",\"d\"]]}",
-        "pairs[2|]:\n  - [2|]: a|b\n  - [2|]: c|d");
+        "pairs[2|]:\n  - [2|]: a|b\n  - [2|]: c|d", 2, 2);
     check_encode("encodes root-level array with tab delimiter",
         "[\"x\",\"y\",\"z\"]",
-        "[3\t]: x\ty\tz");
+        "[3\t]: x\ty\tz", 2, 1);
     check_encode("encodes root-level array with pipe delimiter",
         "[\"x\",\"y\",\"z\"]",
-        "[3|]: x|y|z");
+        "[3|]: x|y|z", 2, 2);
     check_encode("encodes root-level array of objects with tab delimiter",
         "[{\"id\":1},{\"id\":2}]",
-        "[2\t]{id}:\n  1\n  2");
+        "[2\t]{id}:\n  1\n  2", 2, 1);
     check_encode("encodes root-level array of objects with pipe delimiter",
         "[{\"id\":1},{\"id\":2}]",
-        "[2|]{id}:\n  1\n  2");
+        "[2|]{id}:\n  1\n  2", 2, 2);
     check_encode("quotes strings containing tab delimiter",
         "{\"items\":[\"a\",\"b\\tc\",\"d\"]}",
-        "items[3\t]: a\t\"b\\tc\"\td");
+        "items[3\t]: a\t\"b\\tc\"\td", 2, 1);
     check_encode("quotes strings containing pipe delimiter",
         "{\"items\":[\"a\",\"b|c\",\"d\"]}",
-        "items[3|]: a|\"b|c\"|d");
+        "items[3|]: a|\"b|c\"|d", 2, 2);
     check_encode("does not quote commas with tab delimiter",
         "{\"items\":[\"a,b\",\"c,d\"]}",
-        "items[2\t]: a,b\tc,d");
+        "items[2\t]: a,b\tc,d", 2, 1);
     check_encode("does not quote commas with pipe delimiter",
         "{\"items\":[\"a,b\",\"c,d\"]}",
-        "items[2|]: a,b|c,d");
+        "items[2|]: a,b|c,d", 2, 2);
     check_encode("quotes tabular values containing comma delimiter",
         "{\"items\":[{\"id\":1,\"note\":\"a,b\"},{\"id\":2,\"note\":\"c,d\"}]}",
-        "items[2]{id,note}:\n  1,\"a,b\"\n  2,\"c,d\"");
+        "items[2]{id,note}:\n  1,\"a,b\"\n  2,\"c,d\"", 2, 0);
     check_encode("does not quote commas in tabular values with tab delimiter",
         "{\"items\":[{\"id\":1,\"note\":\"a,b\"},{\"id\":2,\"note\":\"c,d\"}]}",
-        "items[2\t]{id\tnote}:\n  1\ta,b\n  2\tc,d");
+        "items[2\t]{id\tnote}:\n  1\ta,b\n  2\tc,d", 2, 1);
     check_encode("does not quote commas in object values with pipe delimiter",
         "{\"note\":\"a,b\"}",
-        "note: a,b");
+        "note: a,b", 2, 2);
     check_encode("does not quote commas in object values with tab delimiter",
         "{\"note\":\"a,b\"}",
-        "note: a,b");
+        "note: a,b", 2, 1);
     check_encode("quotes nested array values containing pipe delimiter",
         "{\"pairs\":[[\"a\",\"b|c\"]]}",
-        "pairs[1|]:\n  - [2|]: a|\"b|c\"");
+        "pairs[1|]:\n  - [2|]: a|\"b|c\"", 2, 2);
     check_encode("quotes nested array values containing tab delimiter",
         "{\"pairs\":[[\"a\",\"b\\tc\"]]}",
-        "pairs[1\t]:\n  - [2\t]: a\t\"b\\tc\"");
+        "pairs[1\t]:\n  - [2\t]: a\t\"b\\tc\"", 2, 1);
     check_encode("preserves ambiguity quoting regardless of delimiter",
         "{\"items\":[\"true\",\"42\",\"-3.14\"]}",
-        "items[3|]: \"true\"|\"42\"|\"-3.14\"");
+        "items[3|]: \"true\"|\"42\"|\"-3.14\"", 2, 2);
     check_encode("encodes folded chain to primitive (safe mode)",
         "{\"a\":{\"b\":{\"c\":1}}}",
-        "a.b.c: 1");
+        "a.b.c: 1", 2, 0);
     check_encode("encodes folded chain with inline array",
         "{\"data\":{\"meta\":{\"items\":[\"x\",\"y\"]}}}",
-        "data.meta.items[2]: x,y");
+        "data.meta.items[2]: x,y", 2, 0);
     check_encode("encodes folded chain with tabular array",
         "{\"a\":{\"b\":{\"items\":[{\"id\":1,\"name\":\"A\"},{\"id\":2,\"name\":\"B\"}]}}}",
-        "a.b.items[2]{id,name}:\n  1,A\n  2,B");
+        "a.b.items[2]{id,name}:\n  1,A\n  2,B", 2, 0);
     check_encode("skips folding when segment requires quotes (safe mode)",
         "{\"data\":{\"full-name\":{\"x\":1}}}",
-        "data:\n  \"full-name\":\n    x: 1");
+        "data:\n  \"full-name\":\n    x: 1", 2, 0);
     check_encode("skips folding on sibling literal-key collision (safe mode)",
         "{\"data\":{\"meta\":{\"items\":[1,2]}},\"data.meta.items\":\"literal\"}",
-        "data:\n  meta:\n    items[2]: 1,2\ndata.meta.items: literal");
+        "data:\n  meta:\n    items[2]: 1,2\ndata.meta.items: literal", 2, 0);
     check_encode("encodes partial folding with flattenDepth=2",
         "{\"a\":{\"b\":{\"c\":{\"d\":1}}}}",
-        "a.b:\n  c:\n    d: 1");
+        "a.b:\n  c:\n    d: 1", 2, 0);
     check_encode("encodes full chain with flattenDepth=Infinity (default)",
         "{\"a\":{\"b\":{\"c\":{\"d\":1}}}}",
-        "a.b.c.d: 1");
+        "a.b.c.d: 1", 2, 0);
     check_encode("encodes standard nesting with flattenDepth=0 (no folding)",
         "{\"a\":{\"b\":{\"c\":1}}}",
-        "a:\n  b:\n    c: 1");
+        "a:\n  b:\n    c: 1", 2, 0);
     check_encode("encodes standard nesting with flattenDepth=1 (no practical effect)",
         "{\"a\":{\"b\":{\"c\":1}}}",
-        "a:\n  b:\n    c: 1");
+        "a:\n  b:\n    c: 1", 2, 0);
     check_encode("encodes standard nesting with keyFolding=off (baseline)",
         "{\"a\":{\"b\":{\"c\":1}}}",
-        "a:\n  b:\n    c: 1");
+        "a:\n  b:\n    c: 1", 2, 0);
     check_encode("encodes folded chain ending with empty object",
         "{\"a\":{\"b\":{\"c\":{}}}}",
-        "a.b.c:");
+        "a.b.c:", 2, 0);
     check_encode("stops folding at array boundary (not single-key object)",
         "{\"a\":{\"b\":[1,2]}}",
-        "a.b[2]: 1,2");
+        "a.b[2]: 1,2", 2, 0);
     check_encode("encodes folded chains preserving sibling field order",
         "{\"first\":{\"second\":{\"third\":1}},\"simple\":2,\"short\":{\"path\":3}}",
-        "first.second.third: 1\nsimple: 2\nshort.path: 3");
+        "first.second.third: 1\nsimple: 2\nshort.path: 3", 2, 0);
     check_encode("preserves key order in objects",
         "{\"id\":123,\"name\":\"Ada\",\"active\":true}",
-        "id: 123\nname: Ada\nactive: true");
+        "id: 123\nname: Ada\nactive: true", 2, 0);
     check_encode("encodes null values in objects",
         "{\"id\":123,\"value\":null}",
-        "id: 123\nvalue: null");
+        "id: 123\nvalue: null", 2, 0);
     check_encode("encodes empty objects as empty string",
         "{}",
-        "");
+        "", 2, 0);
     check_encode("quotes string value with colon",
         "{\"note\":\"a:b\"}",
-        "note: \"a:b\"");
+        "note: \"a:b\"", 2, 0);
     check_encode("quotes string value with comma",
         "{\"note\":\"a,b\"}",
-        "note: \"a,b\"");
+        "note: \"a,b\"", 2, 0);
     check_encode("quotes string value with newline",
         "{\"text\":\"line1\\nline2\"}",
-        "text: \"line1\\nline2\"");
+        "text: \"line1\\nline2\"", 2, 0);
     check_encode("quotes string value with embedded quotes",
         "{\"text\":\"say \\\"hello\\\"\"}",
-        "text: \"say \\\"hello\\\"\"");
+        "text: \"say \\\"hello\\\"\"", 2, 0);
     check_encode("quotes string value with leading space",
         "{\"text\":\" padded \"}",
-        "text: \" padded \"");
+        "text: \" padded \"", 2, 0);
     check_encode("quotes string value with only spaces",
         "{\"text\":\"  \"}",
-        "text: \"  \"");
+        "text: \"  \"", 2, 0);
     check_encode("quotes string value that looks like true",
         "{\"v\":\"true\"}",
-        "v: \"true\"");
+        "v: \"true\"", 2, 0);
     check_encode("quotes string value that looks like number",
         "{\"v\":\"42\"}",
-        "v: \"42\"");
+        "v: \"42\"", 2, 0);
     check_encode("quotes string value that looks like negative decimal",
         "{\"v\":\"-7.5\"}",
-        "v: \"-7.5\"");
+        "v: \"-7.5\"", 2, 0);
     check_encode("quotes key with colon",
         "{\"order:id\":7}",
-        "\"order:id\": 7");
+        "\"order:id\": 7", 2, 0);
     check_encode("quotes key with brackets",
         "{\"[index]\":5}",
-        "\"[index]\": 5");
+        "\"[index]\": 5", 2, 0);
     check_encode("quotes key with braces",
         "{\"{key}\":5}",
-        "\"{key}\": 5");
+        "\"{key}\": 5", 2, 0);
     check_encode("quotes key with comma",
         "{\"a,b\":1}",
-        "\"a,b\": 1");
+        "\"a,b\": 1", 2, 0);
     check_encode("quotes key with spaces",
         "{\"full name\":\"Ada\"}",
-        "\"full name\": Ada");
+        "\"full name\": Ada", 2, 0);
     check_encode("quotes key with leading hyphen",
         "{\"-lead\":1}",
-        "\"-lead\": 1");
+        "\"-lead\": 1", 2, 0);
     check_encode("quotes key with leading and trailing spaces",
         "{\" a \":1}",
-        "\" a \": 1");
+        "\" a \": 1", 2, 0);
     check_encode("quotes numeric key",
         "{\"123\":\"x\"}",
-        "\"123\": x");
+        "\"123\": x", 2, 0);
     check_encode("quotes empty string key",
         "{\"\":1}",
-        "\"\": 1");
+        "\"\": 1", 2, 0);
     check_encode("escapes newline in key",
         "{\"line\\nbreak\":1}",
-        "\"line\\nbreak\": 1");
+        "\"line\\nbreak\": 1", 2, 0);
     check_encode("escapes tab in key",
         "{\"tab\\there\":2}",
-        "\"tab\\there\": 2");
+        "\"tab\\there\": 2", 2, 0);
     check_encode("escapes quotes in key",
         "{\"he said \\\"hi\\\"\":1}",
-        "\"he said \\\"hi\\\"\": 1");
+        "\"he said \\\"hi\\\"\": 1", 2, 0);
     check_encode("encodes deeply nested objects",
         "{\"a\":{\"b\":{\"c\":\"deep\"}}}",
-        "a:\n  b:\n    c: deep");
+        "a:\n  b:\n    c: deep", 2, 0);
     check_encode("encodes empty nested object",
         "{\"user\":{}}",
-        "user:");
+        "user:", 2, 0);
     check_encode("encodes safe strings without quotes",
         "\"hello\"",
-        "hello");
+        "hello", 2, 0);
     check_encode("encodes safe string with underscore and numbers",
         "\"Ada_99\"",
-        "Ada_99");
+        "Ada_99", 2, 0);
     check_encode("quotes empty string",
         "\"\"",
-        "\"\"");
+        "\"\"", 2, 0);
     check_encode("quotes string that looks like true",
         "\"true\"",
-        "\"true\"");
+        "\"true\"", 2, 0);
     check_encode("quotes string that looks like false",
         "\"false\"",
-        "\"false\"");
+        "\"false\"", 2, 0);
     check_encode("quotes string that looks like null",
         "\"null\"",
-        "\"null\"");
+        "\"null\"", 2, 0);
     check_encode("quotes string that looks like integer",
         "\"42\"",
-        "\"42\"");
+        "\"42\"", 2, 0);
     check_encode("quotes string that looks like negative decimal",
         "\"-3.14\"",
-        "\"-3.14\"");
+        "\"-3.14\"", 2, 0);
     check_encode("quotes string that looks like scientific notation",
         "\"1e-6\"",
-        "\"1e-6\"");
+        "\"1e-6\"", 2, 0);
     check_encode("quotes string with leading zero",
         "\"05\"",
-        "\"05\"");
+        "\"05\"", 2, 0);
     check_encode("escapes newline in string",
         "\"line1\\nline2\"",
-        "\"line1\\nline2\"");
+        "\"line1\\nline2\"", 2, 0);
     check_encode("escapes tab in string",
         "\"tab\\there\"",
-        "\"tab\\there\"");
+        "\"tab\\there\"", 2, 0);
     check_encode("escapes carriage return in string",
         "\"return\\rcarriage\"",
-        "\"return\\rcarriage\"");
+        "\"return\\rcarriage\"", 2, 0);
     check_encode("escapes backslash in string",
         "\"C:\\\\Users\\\\path\"",
-        "\"C:\\\\Users\\\\path\"");
+        "\"C:\\\\Users\\\\path\"", 2, 0);
     check_encode("quotes string with array-like syntax",
         "\"[3]: x,y\"",
-        "\"[3]: x,y\"");
+        "\"[3]: x,y\"", 2, 0);
     check_encode("quotes string starting with hyphen-space",
         "\"- item\"",
-        "\"- item\"");
+        "\"- item\"", 2, 0);
     check_encode("quotes single hyphen as object value",
         "{\"marker\":\"-\"}",
-        "marker: \"-\"");
+        "marker: \"-\"", 2, 0);
     check_encode("quotes string starting with hyphen as object value",
         "{\"note\":\"- item\"}",
-        "note: \"- item\"");
+        "note: \"- item\"", 2, 0);
     check_encode("quotes single hyphen in array",
         "{\"items\":[\"-\"]}",
-        "items[1]: \"-\"");
+        "items[1]: \"-\"", 2, 0);
     check_encode("quotes leading-hyphen string in array",
         "{\"tags\":[\"a\",\"- item\",\"b\"]}",
-        "tags[3]: a,\"- item\",b");
+        "tags[3]: a,\"- item\",b", 2, 0);
     check_encode("quotes string with bracket notation",
         "\"[test]\"",
-        "\"[test]\"");
+        "\"[test]\"", 2, 0);
     check_encode("quotes string with brace notation",
         "\"{key}\"",
-        "\"{key}\"");
+        "\"{key}\"", 2, 0);
     check_encode("encodes positive integer",
         "42",
-        "42");
+        "42", 2, 0);
     check_encode("encodes decimal number",
         "3.14",
-        "3.14");
+        "3.14", 2, 0);
     check_encode("encodes negative integer",
         "-7",
-        "-7");
+        "-7", 2, 0);
     check_encode("encodes zero",
         "0",
-        "0");
+        "0", 2, 0);
     check_encode("encodes negative zero as zero",
         "0",
-        "0");
+        "0", 2, 0);
     check_encode("encodes scientific notation as decimal",
         "1000000",
-        "1000000");
+        "1000000", 2, 0);
     check_encode("encodes small decimal from scientific notation",
         "1e-06",
-        "0.000001");
+        "0.000001", 2, 0);
     check_encode("encodes large number",
         "100000000000000000000",
-        "100000000000000000000");
+        "100000000000000000000", 2, 0);
     check_encode("encodes MAX_SAFE_INTEGER",
         "9007199254740991",
-        "9007199254740991");
+        "9007199254740991", 2, 0);
     check_encode("encodes repeating decimal with full precision",
         "0.3333333333333333",
-        "0.3333333333333333");
+        "0.3333333333333333", 2, 0);
     check_encode("encodes true",
         "true",
-        "true");
+        "true", 2, 0);
     check_encode("encodes false",
         "false",
-        "false");
+        "false", 2, 0);
     check_encode("produces no trailing newline at end of output",
         "{\"id\":123}",
-        "id: 123");
+        "id: 123", 2, 0);
     check_encode("maintains proper indentation for nested structures",
         "{\"user\":{\"id\":123,\"name\":\"Ada\"},\"items\":[\"a\",\"b\"]}",
-        "user:\n  id: 123\n  name: Ada\nitems[2]: a,b");
+        "user:\n  id: 123\n  name: Ada\nitems[2]: a,b", 2, 0);
     check_encode("respects custom indent size option",
         "{\"user\":{\"name\":\"Ada\",\"role\":\"admin\"}}",
-        "user:\n    name: Ada\n    role: admin");
+        "user:\n    name: Ada\n    role: admin", 4, 0);
 
     printf("\n%d tests: %d passed, %d failed\n",
            tests_run, tests_passed, tests_failed);

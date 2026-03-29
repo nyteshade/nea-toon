@@ -527,18 +527,24 @@ static char *parse_key_value(const char *line, int linelen,
         if (!key) return NULL;
         pos += endq;
     } else {
-        /* Unquoted key - read until ':' or '[' */
+        /* Unquoted key - first try reading until ':' only.
+           This handles literal keys with brackets like foo[1][bar]. */
         int kstart = pos;
-        while (pos < linelen && line[pos] != ':' && line[pos] != '[') pos++;
+        while (pos < linelen && line[pos] != ':') pos++;
+        if (pos >= linelen) {
+            /* No colon found at all */
+            return NULL;
+        }
         klen = pos - kstart;
+        /* Trim trailing spaces from key */
+        while (klen > 0 && line[kstart + klen - 1] == ' ') klen--;
         key = (char *)malloc(klen + 1);
         memcpy(key, line + kstart, klen);
         key[klen] = '\0';
     }
 
-    /* Must have ':' */
+    /* pos should be at ':' */
     if (pos >= linelen || line[pos] != ':') {
-        /* Could be an array header - let caller handle */
         free(key);
         return NULL;
     }

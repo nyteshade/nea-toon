@@ -4,57 +4,15 @@ FAIL parses list items whose first field is a tabular array
 FAIL parses arrays of arrays within objects
   expected: {"items":[{"matrix":[[1,2],[3,4]],"name":"grid"}]}
   got:      {"items":[[]]}
-FAIL parses quoted strings and mixed lengths in nested arrays
-  expected: {"pairs":[["a","b"],["c,d","e:f","true"]]}
-  got:      {"pairs":[["a","b"],["c,d","e:f",true,""]]}
-FAIL parses root-level primitive array inline
-  expected: ["x","y","true",true,10]
-  got:      ["x","y",true,true,10]
-FAIL parses single-item array with empty string
-  expected: {"items":[""]}
-  got:      {"items":["",""]}
-FAIL parses whitespace-only strings in arrays
-  expected: {"items":[" ","  "]}
-  got:      {"items":[" ","  ",""]}
-FAIL parses strings with delimiters in arrays
-  expected: {"items":["a","b,c","d:e"]}
-  got:      {"items":["a","b,c","d:e",""]}
-FAIL parses strings that look like primitives when quoted
-  expected: {"items":["x","true","42","-3.14"]}
-  got:      {"items":["x",true,42,-3.14,""]}
-FAIL parses strings with structural tokens in arrays
-  expected: {"items":["[5]","- item","{key}"]}
-  got:      {"items":["[5]","- item","{key}",""]}
 FAIL parses nested arrays inside list items with default comma delimiter
   expected: {"items":[{"tags":["a","b","c"]}]}
   got:      {"items":[["a","b","c"]]}
 FAIL parses nested arrays inside list items with default comma delimiter when parent uses pipe
   expected: {"items":[{"tags":["a","b","c"]}]}
   got:      {"items":[["a","b","c"]]}
-FAIL parses nested array values containing pipe delimiter
-  expected: {"pairs":[["a","b|c"]]}
-  got:      {"pairs":[["a","b|c",""]]}
-FAIL parses nested array values containing tab delimiter
-  expected: {"pairs":[["a","b\tc"]]}
-  got:      {"pairs":[["a","b\tc",""]]}
-FAIL preserves quoted ambiguity with pipe delimiter
-  expected: {"items":["true","42","-3.14"]}
-  got:      {"items":[true,42,-3.14,""]}
-FAIL preserves quoted ambiguity with tab delimiter
-  expected: {"items":["true","42","-3.14"]}
-  got:      {"items":[true,42,-3.14,""]}
-FAIL parses structural-looking strings when quoted with pipe delimiter
-  expected: {"items":["[5]","{key}","- item"]}
-  got:      {"items":["[5]","{key}","- item",""]}
-FAIL parses structural-looking strings when quoted with tab delimiter
-  expected: {"items":["[5]","{key}","- item"]}
-  got:      {"items":["[5]","{key}","- item",""]}
 FAIL accepts correct indentation with custom indent size (4 spaces with indent=4)
   expected: {"a":{"b":1}}
   got:      {"a":{}}
-FAIL accepts tabs in quoted array elements
-  expected: {"items":["a\tb","c\td"]}
-  got:      {"items":["a\tb","c\td",""]}
 FAIL parses very small exponent
   expected: {"value":1e-10}
   got:      {"value":0.0000000001}
@@ -91,124 +49,6 @@ FAIL preserves quoted dotted key as literal when expandPaths=safe
 FAIL expands keys creating empty nested objects
   expected: {"a":{"b":{"c":{}}}}
   got:      {"a.b.c":{}}
-FAIL tolerates spaces around delimiters with quoted values
-  expected: {"items":["a","b","c"]}
-  got:      {"items":["a","b","c",""]}
-FAIL encodes root-level array mixing primitive, object, and array of objects in list format
-  expected: [3]:
-  - summary
-  - id: 1
-    name: Ada
-  - [2]:
-    - id: 2
-    - status: draft
-  got:      [3]:
-  - summary
-  - id: 1
-    name: Ada
-  - [2]:
-    - null
-    - null
-FAIL preserves field order in list items - array first
-  expected: items[1]:
-  - nums[3]: 1,2,3
-    name: Ada
-  got:      items[1]:
-  - nums:
-    [3]: 1,2,3
-    name: Ada
-FAIL preserves field order in list items - primitive first
-  expected: items[1]:
-  - name: Ada
-    nums[3]: 1,2,3
-  got:      items[1]:
-  - name: Ada
-    nums:
-      [3]: 1,2,3
-FAIL uses list format for objects containing arrays of arrays
-  expected: items[1]:
-  - matrix[2]:
-      - [2]: 1,2
-      - [2]: 3,4
-    name: grid
-  got:      items[1]:
-  - matrix:
-    [2]:
-      - [2]: 1,2
-      - [2]: 3,4
-    name: grid
-FAIL uses tabular format for nested uniform object arrays
-  expected: items[1]:
-  - users[2]{id,name}:
-      1,Ada
-      2,Bob
-    status: active
-  got:      items[1]:
-  - users[2]{id,name}:
-      1,Ada
-      2,Bob
-    active
-FAIL uses list format for nested object arrays with mismatched keys
-  expected: items[1]:
-  - users[2]:
-      - id: 1
-        name: Ada
-      - id: 2
-    status: active
-  got:      items[1]:
-  - users:
-    [2]:
-      - id: 1
-        name: Ada
-      - id: 2
-    status: active
-FAIL uses list format for objects with multiple array fields
-  expected: items[1]:
-  - nums[2]: 1,2
-    tags[2]: a,b
-    name: test
-  got:      items[1]:
-  - nums:
-    [2]: 1,2
-    tags:
-      [2]: a,b
-    name: test
-FAIL uses list format for objects with only array fields
-  expected: items[1]:
-  - nums[3]: 1,2,3
-    tags[2]: a,b
-  got:      items[1]:
-  - nums:
-    [3]: 1,2,3
-    tags:
-      [2]: a,b
-FAIL encodes objects with empty arrays in list format
-  expected: items[1]:
-  - name: Ada
-    data[0]:
-  got:      items[1]:
-  - name: Ada
-    data:
-      [0]:
-FAIL uses canonical encoding for multi-field list-item objects with tabular arrays
-  expected: items[1]:
-  - users[2]{id}:
-      1
-      2
-    note: x
-  got:      items[1]:
-  - users[2]{id}:
-      1
-      2
-    x
-FAIL places empty arrays on hyphen line when first
-  expected: items[1]:
-  - data[0]:
-    name: x
-  got:      items[1]:
-  - data:
-    [0]:
-    name: x
 FAIL encodes primitive arrays with tab delimiter
   expected: tags[3	]: reading	gaming	coding
   got:      tags[3]: reading,gaming,coding
@@ -353,9 +193,6 @@ short.path: 3
 simple: 2
 short:
   path: 3
-FAIL encodes repeating decimal with full precision
-  expected: 0.3333333333333333
-  got:      0.333333333333333
 FAIL respects custom indent size option
   expected: user:
     name: Ada
@@ -364,4 +201,4 @@ FAIL respects custom indent size option
   name: Ada
   role: admin
 
-325 tests: 252 passed, 73 failed
+325 tests: 279 passed, 46 failed

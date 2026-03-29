@@ -315,14 +315,14 @@ def generate_test_runner(fixtures):
     lines.append('static int tests_failed = 0;')
     lines.append('')
     lines.append('static void check_decode(const char *name, const char *input,')
-    lines.append('                         const char *expected_json)')
+    lines.append('                         const char *expected_json, int indent, int strict)')
     lines.append('{')
     lines.append('    ToonDecodeOpts opts;')
     lines.append('    const char *err = NULL;')
     lines.append('    JsonValue *result;')
     lines.append('    char *json;')
-    lines.append('    opts.indent = 2;')
-    lines.append('    opts.strict = 0;')
+    lines.append('    opts.indent = indent;')
+    lines.append('    opts.strict = strict;')
     lines.append('    tests_run++;')
     lines.append('    result = toon_decode(input, &opts, &err);')
     lines.append('    if (!result) {')
@@ -346,7 +346,7 @@ def generate_test_runner(fixtures):
     lines.append('}')
     lines.append('')
     lines.append('static void check_encode(const char *name, const char *input_json,')
-    lines.append('                         const char *expected_toon)')
+    lines.append('                         const char *expected_toon, int indent, int delim)')
     lines.append('{')
     lines.append('    const char *err = NULL;')
     lines.append('    JsonValue *val;')
@@ -359,8 +359,8 @@ def generate_test_runner(fixtures):
     lines.append('        tests_failed++;')
     lines.append('        return;')
     lines.append('    }')
-    lines.append('    opts.indent = 2;')
-    lines.append('    opts.delim = DELIM_COMMA;')
+    lines.append('    opts.indent = indent;')
+    lines.append('    opts.delim = (ToonDelimiter)delim;')
     lines.append('    toon = toon_encode(val, &opts);')
     lines.append('    if (strcmp(toon, expected_toon) == 0) {')
     lines.append('        tests_passed++;')
@@ -388,19 +388,22 @@ def generate_test_runner(fixtures):
                 expected = test.get('expected')
                 if expected is None:
                     continue
-                # Convert expected to JSON string
                 expected_json = json.dumps(expected, separators=(',', ':'))
 
-                # Skip tests with Unicode beyond ASCII for now
                 if any(ord(c) > 127 for c in input_str + expected_json):
                     continue
+
+                # Extract decode options
+                opts = test.get('options', {})
+                opt_indent = opts.get('indent', 2)
+                opt_strict = 1 if opts.get('strict', False) else 0
 
                 c_input = escape_c_string(input_str)
                 c_expected = escape_c_string(expected_json)
                 c_name = escape_c_string(name)
                 lines.append(f'    check_decode("{c_name}",')
                 lines.append(f'        "{c_input}",')
-                lines.append(f'        "{c_expected}");')
+                lines.append(f'        "{c_expected}", {opt_indent}, {opt_strict});')
                 test_count += 1
 
             elif category == 'encode' and not should_error:
@@ -410,16 +413,26 @@ def generate_test_runner(fixtures):
                     continue
 
                 input_json = json.dumps(input_val, separators=(',', ':'))
-                # Skip Unicode
                 if any(ord(c) > 127 for c in input_json + expected):
                     continue
+
+                # Extract encode options
+                opts = test.get('options', {})
+                opt_indent = opts.get('indent', 2)
+                delim_str = opts.get('delimiter', ',')
+                if delim_str == '\t':
+                    opt_delim = 1  # DELIM_TAB
+                elif delim_str == '|':
+                    opt_delim = 2  # DELIM_PIPE
+                else:
+                    opt_delim = 0  # DELIM_COMMA
 
                 c_input = escape_c_string(input_json)
                 c_expected = escape_c_string(expected)
                 c_name = escape_c_string(name)
                 lines.append(f'    check_encode("{c_name}",')
                 lines.append(f'        "{c_input}",')
-                lines.append(f'        "{c_expected}");')
+                lines.append(f'        "{c_expected}", {opt_indent}, {opt_delim});')
                 test_count += 1
 
     lines.append('')
