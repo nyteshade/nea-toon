@@ -463,7 +463,7 @@ CPU_PROFILES = [
 ]
 
 SOURCE_FILES_C = ['main.c', 'toon_decode.c', 'toon_encode.c',
-                  'json_parse.c', 'json_emit.c', 'toon_util.c']
+                  'json_parse.c', 'json_emit.c', 'toon_util.c', 'toon_path.c']
 OBJS_STR = ' '.join(f.replace('.c', '.o') for f in SOURCE_FILES_C)
 
 

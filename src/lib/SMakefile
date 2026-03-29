@@ -11,7 +11,7 @@ CC = sc:c/sc
 LD = sc:c/slink
 
 # Library sources: the library wrapper + all core toon implementation files
-LIBOBJS = toon_lib.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
+LIBOBJS = toon_lib.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o toon_path.o
 
 # Compiler flags for library code
 LIBCFLAGS = LIBCODE NOSTACKCHECK NOCHKABORT NOICONS IDLEN=80 IDIR=INCLUDE: IDIR=//src
@@ -52,6 +52,9 @@ json_emit.o: //src/json_emit.c //src/toon.h
 
 toon_util.o: //src/toon_util.c //src/toon.h
 	$(CC) $(LIBCFLAGS) //src/toon_util.c
+
+toon_path.o: //src/toon_path.c //src/toon.h
+	$(CC) $(LIBCFLAGS) //src/toon_path.c
 
 example: toon_example
 toon_example: toon_example.o
