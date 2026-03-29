@@ -446,6 +446,96 @@ static toon_bool json_del_path(JsonValue *root, const char *path)
     return FALSE;
 }
 
+/* ---- Root path check ---- */
+
+static toon_bool is_root_path(const char *path)
+{
+    if (!path) return TRUE;
+    if (path[0] == '.' && path[1] == '\0') return TRUE;
+    if (path[0] == '\0') return TRUE;
+    return FALSE;
+}
+
+/* ---- Append to array at path ---- */
+
+static toon_bool json_append_path(JsonValue *root, const char *path,
+                                  JsonValue *new_val)
+{
+    JsonValue *target;
+
+    if (is_root_path(path)) {
+        /* Append to root - root must be or become an array */
+        if (root->type != JSON_ARRAY) return FALSE;
+        json_array_push(root, new_val);
+        return TRUE;
+    }
+
+    /* Navigate to the target, creating intermediates */
+    {
+        PathSeg segs[64];
+        int nseg, i;
+        JsonValue *cur = root;
+
+        nseg = parse_path_segments(path, segs, 64);
+        if (nseg == 0) return FALSE;
+
+        /* Walk the full path (all segments), creating as needed */
+        for (i = 0; i < nseg; i++) {
+            if (!cur) return FALSE;
+
+            if (segs[i].type == 1) {
+                if (cur->type != JSON_OBJECT) return FALSE;
+                {
+                    int j;
+                    toon_bool found = FALSE;
+                    for (j = 0; j < cur->u.obj.count; j++) {
+                        if (strcmp(cur->u.obj.pairs[j].key, segs[i].key) == 0) {
+                            cur = cur->u.obj.pairs[j].value;
+                            found = TRUE;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        /* Create an array at this key */
+                        JsonValue *arr = json_new_array();
+                        json_object_set(cur, segs[i].key, arr);
+                        cur = arr;
+                    }
+                }
+            } else if (segs[i].type == 2) {
+                if (cur->type == JSON_ARRAY) {
+                    if (segs[i].idx < cur->u.arr.count)
+                        cur = cur->u.arr.items[segs[i].idx];
+                    else
+                        return FALSE;
+                } else if (cur->type == JSON_OBJECT) {
+                    int j;
+                    toon_bool found = FALSE;
+                    for (j = 0; j < cur->u.obj.count; j++) {
+                        if (strcmp(cur->u.obj.pairs[j].key, segs[i].key) == 0) {
+                            cur = cur->u.obj.pairs[j].value;
+                            found = TRUE;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        JsonValue *arr = json_new_array();
+                        json_object_set(cur, segs[i].key, arr);
+                        cur = arr;
+                    }
+                } else {
+                    return FALSE;
+                }
+            }
+        }
+
+        /* cur should now be an array — append to it */
+        if (cur->type != JSON_ARRAY) return FALSE;
+        json_array_push(cur, new_val);
+        return TRUE;
+    }
+}
+
 /* ---- Parse a CLI value string into a JsonValue ---- */
 
 static JsonValue *parse_cli_value(const char *s)
@@ -553,7 +643,7 @@ static void print_value(const JsonValue *v, OutputFmt fmt,
 
 static void print_usage(void)
 {
-    printf("TOON - Token-Oriented Object Notation CLI v1.2\n");
+    printf("TOON - Token-Oriented Object Notation CLI v1.3\n");
     printf("Implements TOON Spec v3.0\n\n");
     printf("Usage:\n");
     printf("  toon encode [opts] [file.json]   JSON to TOON\n");
@@ -569,15 +659,17 @@ static void print_usage(void)
     printf("  -o <file>  Output file (default stdout)\n");
     printf("  -j         Output as JSON (get command)\n");
     printf("  -t         Output as TOON (get command, default)\n");
-    printf("  -c         Count mode (array len / object fields)\n\n");
+    printf("  -c         Count mode (array len / object fields)\n");
+    printf("  -a         Append to array (set command)\n\n");
     printf("Path syntax (get/set/del):\n");
+    printf("  .                   Root value\n");
     printf("  person.name         Object property\n");
     printf("  users[0].name       Array index + property\n");
     printf("  users.0.name        Alt array index (no brackets)\n");
     printf("  [\"my-key\"].val      Quoted key for special chars\n");
     printf("  data[\"x.y\"]         Literal dotted key\n\n");
-    printf("If no path is given, get shows the whole file.\n");
     printf("set creates the file if it doesn't exist.\n");
+    printf("set -a appends to an array (creates if needed).\n");
 }
 
 /* ---- Main ---- */
@@ -592,6 +684,7 @@ int main(int argc, char *argv[])
     int indent = 2;
     ToonDelimiter delim = DELIM_COMMA;
     toon_bool strict = TRUE;
+    toon_bool append_mode = FALSE;
     OutputFmt outfmt = FMT_AUTO;
     int i;
 
@@ -622,6 +715,8 @@ int main(int argc, char *argv[])
             outfmt = FMT_TOON;
         } else if (strcmp(argv[i], "-c") == 0) {
             outfmt = FMT_COUNT;
+        } else if (strcmp(argv[i], "-a") == 0) {
+            append_mode = TRUE;
         } else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             outfile = argv[++i];
         } else if (argv[i][0] != '-') {
@@ -738,8 +833,8 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        /* No path: return the whole document */
-        if (!getpath) {
+        /* No path or root path: return the whole document */
+        if (is_root_path(getpath)) {
             print_value(root, outfmt, indent, delim);
             json_free(root);
             return 0;
@@ -764,35 +859,68 @@ int main(int argc, char *argv[])
         JsonValue *root;
         JsonValue *new_val;
         char *output;
+        toon_bool ok;
         ToonDecodeOpts dopts;
         ToonEncodeOpts eopts;
 
         if (!infile || !getpath || !setval) {
-            fprintf(stderr, "Usage: toon set [opts] <file> <path> <value>\n");
+            fprintf(stderr, "Usage: toon set [-a] [opts] <file> <path> <value>\n");
             return 1;
         }
 
         input = toon_read_file(infile);
         if (!input) {
-            /* File doesn't exist - start with empty object */
-            root = json_new_object();
+            /* File doesn't exist - create root based on context */
+            if (append_mode && is_root_path(getpath)) {
+                root = json_new_array();
+            } else if (append_mode) {
+                root = json_new_object();
+            } else if (is_root_path(getpath)) {
+                /* Setting root directly — value becomes the whole doc */
+                root = NULL;
+            } else {
+                root = json_new_object();
+            }
         } else {
             dopts.indent = indent;
             dopts.strict = FALSE;
             root = toon_decode(input, &dopts, &err);
             free(input);
         }
-        if (!root) {
-            fprintf(stderr, "TOON decode error: %s\n", err ? err : "unknown");
-            return 1;
-        }
 
         new_val = parse_cli_value(setval);
-        if (!json_set_path(root, getpath, new_val)) {
-            fprintf(stderr, "Cannot set path: %s\n", getpath);
-            json_free(new_val);
-            json_free(root);
-            return 1;
+
+        if (is_root_path(getpath) && !append_mode) {
+            /* Replace the entire document with the new value */
+            if (root) json_free(root);
+            root = new_val;
+            ok = TRUE;
+        } else if (append_mode) {
+            if (!root) {
+                fprintf(stderr, "TOON decode error: %s\n", err ? err : "unknown");
+                json_free(new_val);
+                return 1;
+            }
+            ok = json_append_path(root, getpath, new_val);
+            if (!ok) {
+                fprintf(stderr, "Cannot append to %s (not an array)\n", getpath);
+                json_free(new_val);
+                json_free(root);
+                return 1;
+            }
+        } else {
+            if (!root) {
+                fprintf(stderr, "TOON decode error: %s\n", err ? err : "unknown");
+                json_free(new_val);
+                return 1;
+            }
+            ok = json_set_path(root, getpath, new_val);
+            if (!ok) {
+                fprintf(stderr, "Cannot set path: %s\n", getpath);
+                json_free(new_val);
+                json_free(root);
+                return 1;
+            }
         }
 
         eopts.indent = indent;

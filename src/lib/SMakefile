@@ -32,7 +32,7 @@ FROM lib:libent.o lib:libinit.o $(LIBOBJS)
 TO toon.library
 LIB $(LIBS)
 NOICONS SD
-LIBVERSION 1 LIBREVISION 2
+LIBVERSION 1 LIBREVISION 3
 <
 
 toon_lib.o: toon_lib.c //src/toon.h
