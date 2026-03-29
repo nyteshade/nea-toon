@@ -10,21 +10,9 @@ FAIL parses nested arrays inside list items with default comma delimiter
 FAIL parses nested arrays inside list items with default comma delimiter when parent uses pipe
   expected: {"items":[{"tags":["a","b","c"]}]}
   got:      {"items":[["a","b","c"]]}
-FAIL accepts correct indentation with custom indent size (4 spaces with indent=4)
-  expected: {"a":{"b":1}}
-  got:      {"a":{}}
 FAIL parses very small exponent
   expected: {"value":1e-10}
   got:      {"value":0.0000000001}
-FAIL treats extra brackets after valid array segment as literal key
-  expected: {"foo[1][bar]":10}
-  got:      "foo[1][bar]: 10"
-FAIL treats non-integer bracket content as literal key
-  expected: {"foo[bar][1]":20}
-  got:      "foo[bar][1]: 20"
-FAIL treats text between bracket segment and colon as literal key
-  expected: {"foo[2]extra":"a,b"}
-  got:      "foo[2]extra: a,b"
 FAIL expands dotted key to nested object in safe mode
   expected: {"a":{"b":{"c":1}}}
   got:      {"a.b.c":1}
@@ -49,98 +37,6 @@ FAIL preserves quoted dotted key as literal when expandPaths=safe
 FAIL expands keys creating empty nested objects
   expected: {"a":{"b":{"c":{}}}}
   got:      {"a.b.c":{}}
-FAIL encodes primitive arrays with tab delimiter
-  expected: tags[3	]: reading	gaming	coding
-  got:      tags[3]: reading,gaming,coding
-FAIL encodes primitive arrays with pipe delimiter
-  expected: tags[3|]: reading|gaming|coding
-  got:      tags[3]: reading,gaming,coding
-FAIL encodes tabular arrays with tab delimiter
-  expected: items[2	]{sku	qty	price}:
-  A1	2	9.99
-  B2	1	14.5
-  got:      items[2]{sku,qty,price}:
-  A1,2,9.99
-  B2,1,14.5
-FAIL encodes tabular arrays with pipe delimiter
-  expected: items[2|]{sku|qty|price}:
-  A1|2|9.99
-  B2|1|14.5
-  got:      items[2]{sku,qty,price}:
-  A1,2,9.99
-  B2,1,14.5
-FAIL encodes nested arrays with tab delimiter
-  expected: pairs[2	]:
-  - [2	]: a	b
-  - [2	]: c	d
-  got:      pairs[2]:
-  - [2]: a,b
-  - [2]: c,d
-FAIL encodes nested arrays with pipe delimiter
-  expected: pairs[2|]:
-  - [2|]: a|b
-  - [2|]: c|d
-  got:      pairs[2]:
-  - [2]: a,b
-  - [2]: c,d
-FAIL encodes root-level array with tab delimiter
-  expected: [3	]: x	y	z
-  got:      [3]: x,y,z
-FAIL encodes root-level array with pipe delimiter
-  expected: [3|]: x|y|z
-  got:      [3]: x,y,z
-FAIL encodes root-level array of objects with tab delimiter
-  expected: [2	]{id}:
-  1
-  2
-  got:      [2]{id}:
-  1
-  2
-FAIL encodes root-level array of objects with pipe delimiter
-  expected: [2|]{id}:
-  1
-  2
-  got:      [2]{id}:
-  1
-  2
-FAIL quotes strings containing tab delimiter
-  expected: items[3	]: a	"b\tc"	d
-  got:      items[3]: a,"b\tc",d
-FAIL quotes strings containing pipe delimiter
-  expected: items[3|]: a|"b|c"|d
-  got:      items[3]: a,b|c,d
-FAIL does not quote commas with tab delimiter
-  expected: items[2	]: a,b	c,d
-  got:      items[2]: "a,b","c,d"
-FAIL does not quote commas with pipe delimiter
-  expected: items[2|]: a,b|c,d
-  got:      items[2]: "a,b","c,d"
-FAIL does not quote commas in tabular values with tab delimiter
-  expected: items[2	]{id	note}:
-  1	a,b
-  2	c,d
-  got:      items[2]{id,note}:
-  1,"a,b"
-  2,"c,d"
-FAIL does not quote commas in object values with pipe delimiter
-  expected: note: a,b
-  got:      note: "a,b"
-FAIL does not quote commas in object values with tab delimiter
-  expected: note: a,b
-  got:      note: "a,b"
-FAIL quotes nested array values containing pipe delimiter
-  expected: pairs[1|]:
-  - [2|]: a|"b|c"
-  got:      pairs[1]:
-  - [2]: a,b|c
-FAIL quotes nested array values containing tab delimiter
-  expected: pairs[1	]:
-  - [2	]: a	"b\tc"
-  got:      pairs[1]:
-  - [2]: a,"b\tc"
-FAIL preserves ambiguity quoting regardless of delimiter
-  expected: items[3|]: "true"|"42"|"-3.14"
-  got:      items[3]: "true","42","-3.14"
 FAIL encodes folded chain to primitive (safe mode)
   expected: a.b.c: 1
   got:      a:
@@ -193,12 +89,5 @@ short.path: 3
 simple: 2
 short:
   path: 3
-FAIL respects custom indent size option
-  expected: user:
-    name: Ada
-    role: admin
-  got:      user:
-  name: Ada
-  role: admin
 
-325 tests: 279 passed, 46 failed
+325 tests: 304 passed, 21 failed
