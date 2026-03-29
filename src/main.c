@@ -153,37 +153,132 @@ static void print_value(const JsonValue *v, OutputFmt fmt,
     }
 }
 
-/* ---- Usage ---- */
+/* ---- Help ---- */
 
 static void print_usage(void)
 {
-    printf("TOON - Token-Oriented Object Notation CLI v1.3\n");
+    printf("TOON - Token-Oriented Object Notation CLI v1.4\n");
     printf("Implements TOON Spec v3.0\n\n");
-    printf("Usage:\n");
-    printf("  toon encode [opts] [file.json]   JSON to TOON\n");
-    printf("  toon decode [opts] [file.toon]   TOON to JSON\n");
-    printf("  toon get [opts] <file> [path]    Get value\n");
-    printf("  toon set [opts] <file> <path> <value>  Set value\n");
-    printf("  toon del [opts] <file> <path>    Delete value\n\n");
+    printf("Commands:\n");
+    printf("  toon encode [opts] [file]       JSON to TOON\n");
+    printf("  toon decode [opts] [file]       TOON to JSON\n");
+    printf("  toon get [opts] <file> [path]   Read a value\n");
+    printf("  toon set [opts] <file> <path> <value>\n");
+    printf("                                  Write a value\n");
+    printf("  toon del [opts] <file> <path>   Delete a value\n\n");
+    printf("Use 'toon <command> -h' for detailed help.\n");
+}
+
+static void print_path_help(void)
+{
+    printf("\nPath syntax:\n");
+    printf("  .                 Root (whole document)\n");
+    printf("  name              Object property\n");
+    printf("  person.name       Nested property\n");
+    printf("  users[0].name     Array index + property\n");
+    printf("  users.0.name      Same (shell-friendly, no brackets)\n");
+    printf("  [\"my-key\"].val    Quoted key (special chars)\n");
+    printf("  data[\"x.y\"]       Literal dotted key\n");
+}
+
+static void help_encode(void)
+{
+    printf("toon encode - Convert JSON to TOON\n\n");
+    printf("Usage: toon encode [options] [file.json]\n\n");
+    printf("Reads JSON from <file> or stdin, writes TOON to stdout.\n\n");
     printf("Options:\n");
     printf("  -i <n>     Indent size (default 2)\n");
     printf("  -d <delim> Delimiter: comma, tab, pipe\n");
-    printf("  -s         Strict mode (default for decode)\n");
-    printf("  -l         Lenient (non-strict) mode\n");
-    printf("  -o <file>  Output file (default stdout)\n");
-    printf("  -j         Output as JSON (get command)\n");
-    printf("  -t         Output as TOON (get command, default)\n");
-    printf("  -c         Count mode (array len / object fields)\n");
-    printf("  -a         Append to array (set command)\n\n");
-    printf("Path syntax (get/set/del):\n");
-    printf("  .                   Root value\n");
-    printf("  person.name         Object property\n");
-    printf("  users[0].name       Array index + property\n");
-    printf("  users.0.name        Alt array index (no brackets)\n");
-    printf("  [\"my-key\"].val      Quoted key for special chars\n");
-    printf("  data[\"x.y\"]         Literal dotted key\n\n");
-    printf("set creates the file if it doesn't exist.\n");
-    printf("set -a appends to an array (creates if needed).\n");
+    printf("  -o <file>  Write to file instead of stdout\n\n");
+    printf("Examples:\n");
+    printf("  toon encode data.json\n");
+    printf("  toon encode data.json -o data.toon\n");
+    printf("  toon encode -d pipe data.json\n");
+    printf("  echo '{\"a\":1}' | toon encode\n");
+}
+
+static void help_decode(void)
+{
+    printf("toon decode - Convert TOON to JSON\n\n");
+    printf("Usage: toon decode [options] [file.toon]\n\n");
+    printf("Reads TOON from <file> or stdin, writes JSON to stdout.\n\n");
+    printf("Options:\n");
+    printf("  -i <n>     Indent size (default 2)\n");
+    printf("  -s         Strict mode (default)\n");
+    printf("  -l         Lenient mode\n");
+    printf("  -o <file>  Write to file instead of stdout\n\n");
+    printf("Examples:\n");
+    printf("  toon decode data.toon\n");
+    printf("  toon decode -l data.toon\n");
+    printf("  type data.toon | toon decode\n");
+}
+
+static void help_get(void)
+{
+    printf("toon get - Read a value from a TOON file\n\n");
+    printf("Usage: toon get [options] <file> [path]\n\n");
+    printf("Reads the value at <path> from <file>.\n");
+    printf("If no path is given, shows the whole file.\n\n");
+    printf("Options:\n");
+    printf("  -j         Output as JSON\n");
+    printf("  -t         Output as TOON (default for complex values)\n");
+    printf("  -c         Count mode: array length or object field count\n");
+    printf("  -i <n>     Indent size (default 2)\n");
+    printf("  -d <delim> Delimiter for TOON output\n");
+    print_path_help();
+    printf("\nExamples:\n");
+    printf("  toon get data.toon              Show whole file\n");
+    printf("  toon get data.toon server.host  Read nested value\n");
+    printf("  toon get data.toon users.0.name First user's name\n");
+    printf("  toon get -c data.toon users     Count array elements\n");
+    printf("  toon get -j data.toon server    Output as JSON\n");
+}
+
+static void help_set(void)
+{
+    printf("toon set - Write a value to a TOON file\n\n");
+    printf("Usage: toon set [options] <file> <path> <value>\n\n");
+    printf("Sets <path> to <value> in <file>, creating the file\n");
+    printf("and any intermediate objects if they don't exist.\n\n");
+    printf("Options:\n");
+    printf("  -a         Append mode: push <value> onto the array\n");
+    printf("             at <path>, creating it if needed\n");
+    printf("  -i <n>     Indent size (default 2)\n");
+    printf("  -d <delim> Delimiter for output\n");
+    print_path_help();
+    printf("\nValues:\n");
+    printf("  Strings:   toon set f.toon key hello\n");
+    printf("  Numbers:   toon set f.toon key 42\n");
+    printf("  Booleans:  toon set f.toon key true\n");
+    printf("  Null:      toon set f.toon key null\n");
+    printf("  JSON:      toon set f.toon key '{\"a\":1}'\n");
+    printf("  Root:      toon set f.toon . '{\"new\":\"doc\"}'\n");
+    printf("\nAppend examples:\n");
+    printf("  toon set -a f.toon friends Kristin\n");
+    printf("  toon set -a f.toon friends Lacy\n");
+    printf("  toon set -a f.toon . item      Root array append\n");
+}
+
+static void help_del(void)
+{
+    printf("toon del - Delete a value from a TOON file\n\n");
+    printf("Usage: toon del [options] <file> <path>\n\n");
+    printf("Removes the key or array element at <path>.\n");
+    printf("Array elements shift down after deletion.\n\n");
+    printf("Options:\n");
+    printf("  -i <n>     Indent size (default 2)\n");
+    printf("  -d <delim> Delimiter for output\n");
+    print_path_help();
+    printf("\nExamples:\n");
+    printf("  toon del data.toon server.timeout\n");
+    printf("  toon del data.toon users[1]\n");
+    printf("  toon del data.toon users.1       Same (no brackets)\n");
+}
+
+static toon_bool is_help_flag(const char *s)
+{
+    return (strcmp(s, "-h") == 0 || strcmp(s, "--help") == 0 ||
+            strcmp(s, "help") == 0 || strcmp(s, "?") == 0);
 }
 
 /* ---- Main ---- */
@@ -208,6 +303,29 @@ int main(int argc, char *argv[])
     }
 
     command = argv[1];
+
+    /* Handle 'toon help [command]' and 'toon -h' */
+    if (is_help_flag(command)) {
+        if (argc >= 3) {
+            command = argv[2];
+            if (strcmp(command, "encode") == 0) { help_encode(); return 0; }
+            if (strcmp(command, "decode") == 0) { help_decode(); return 0; }
+            if (strcmp(command, "get") == 0)    { help_get(); return 0; }
+            if (strcmp(command, "set") == 0)    { help_set(); return 0; }
+            if (strcmp(command, "del") == 0)    { help_del(); return 0; }
+        }
+        print_usage();
+        return 0;
+    }
+
+    /* Check for 'toon <command> -h' */
+    if (argc >= 3 && is_help_flag(argv[2])) {
+        if (strcmp(command, "encode") == 0) { help_encode(); return 0; }
+        if (strcmp(command, "decode") == 0) { help_decode(); return 0; }
+        if (strcmp(command, "get") == 0)    { help_get(); return 0; }
+        if (strcmp(command, "set") == 0)    { help_set(); return 0; }
+        if (strcmp(command, "del") == 0)    { help_del(); return 0; }
+    }
 
     /* Parse options and arguments */
     i = 2;
@@ -328,7 +446,7 @@ int main(int argc, char *argv[])
         ToonDecodeOpts opts;
 
         if (!infile) {
-            fprintf(stderr, "Usage: toon get [opts] <file> [path]\n");
+            help_get();
             return 1;
         }
 
@@ -378,7 +496,7 @@ int main(int argc, char *argv[])
         ToonEncodeOpts eopts;
 
         if (!infile || !getpath || !setval) {
-            fprintf(stderr, "Usage: toon set [-a] [opts] <file> <path> <value>\n");
+            help_set();
             return 1;
         }
 
@@ -463,7 +581,7 @@ int main(int argc, char *argv[])
         ToonEncodeOpts eopts;
 
         if (!infile || !getpath) {
-            fprintf(stderr, "Usage: toon del [opts] <file> <path>\n");
+            help_del();
             return 1;
         }
 
