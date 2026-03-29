@@ -1545,7 +1545,7 @@ def build_port(args):
         sys.exit(1)
 
     source_files = ['toon.h', 'main.c', 'toon_decode.c', 'toon_encode.c',
-                    'json_parse.c', 'json_emit.c', 'toon_util.c']
+                    'json_parse.c', 'json_emit.c', 'toon_util.c', 'toon_path.c']
     for sf in source_files:
         if not os.path.exists(os.path.join(src_dir, sf)):
             print(f"Error: source file {sf} not found in {src_dir}", file=sys.stderr)
