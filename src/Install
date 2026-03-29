@@ -5,7 +5,7 @@
 ;
 
 ; --- Welcome ---
-requestchoice >ENV:toon_rc TITLE "TOON Installer" BODY "TOON - Token-Oriented Object Notation*n*nThis will install:*n*n  - toon CLI command*n  - toon.library shared library*n  - SDK (optional: includes, fd, static lib)*n*nProceed?" GADGETS "Install|Cancel"
+requestchoice >ENV:toon_rc TITLE "TOON Installer" BODY "TOON v1.2*n*n  CLI, shared library, SDK" GADGETS "Install|Cancel"
 IF $toon_rc EQ 0
   echo "Installation cancelled."
   SKIP end
@@ -52,7 +52,7 @@ ELSE
 ENDIF
 
 ; --- Ask about SDK ---
-requestchoice >ENV:toon_sdk TITLE "Developer SDK" BODY "Install the TOON developer SDK?*n*nIncludes:*n  - C header files*n  - FD file (function descriptors)*n  - Pragma file*n  - toon.lib (static link library)*n  - toon_example (example source)" GADGETS "Yes|No"
+requestchoice >ENV:toon_sdk TITLE "Developer SDK" BODY "Install SDK?*n*nHeaders, FD, pragmas, toon.lib" GADGETS "Yes|No"
 IF $toon_sdk EQ 0
   echo "Skipping SDK installation."
   SKIP done
