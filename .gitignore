@@ -13,6 +13,7 @@ toon-port/toon.060
 toon-port/toon.noopt
 toon-port/test_runner
 release/
+!releases/
 
 # vamos state
 .vamos/
