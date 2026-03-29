@@ -263,4 +263,4 @@ test fixtures.
         - [TOON Reference Implementation (TypeScript)](https://github.com/toon-format/toon)
 
         ---
-        *Port generated on 2026-03-28 by build_port.py*
+        *Port generated on 2026-03-29 by build_port.py*
