@@ -1535,6 +1535,22 @@ def build_port(args):
                 spec_repo = os.path.abspath(candidate)
                 break
 
+        # Auto-clone spec repo if not found and tests are requested
+        if not spec_repo and (args.with_tests or args.release):
+            spec_clone_dir = os.path.join(os.path.dirname(toon_repo), 'spec')
+            print(f"Spec repo not found. Cloning toon-format/spec to {spec_clone_dir}...")
+            import subprocess
+            try:
+                subprocess.run(
+                    ['git', 'clone', 'https://github.com/toon-format/spec.git', spec_clone_dir],
+                    check=True, capture_output=True, text=True, timeout=60
+                )
+                spec_repo = os.path.abspath(spec_clone_dir)
+                print(f"  Cloned successfully.")
+            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as e:
+                print(f"  Warning: Could not clone spec repo: {e}")
+                print(f"  Tests will be generated without spec fixtures.")
+
     # Validate inputs
     if not os.path.isdir(toon_repo):
         print(f"Error: toon repo not found at {toon_repo}", file=sys.stderr)

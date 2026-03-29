@@ -21,3 +21,4 @@ release/
 # Legacy test files
 test_hello.*
 toon-port/test_library
+spec/
