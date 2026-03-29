@@ -149,4 +149,23 @@ toon_bool toon_needs_quote(const char *s, char delim);
 /* Check if string is valid unquoted key */
 toon_bool toon_valid_unquoted_key(const char *s);
 
+/* ---- Path operations on JsonValue trees ---- */
+
+/* Check if path refers to the root ("." or NULL or "") */
+toon_bool toon_is_root_path(const char *path);
+
+/* Get a value by path. Returns pointer into the tree (not a copy). */
+const JsonValue *toon_path_get(const JsonValue *root, const char *path);
+
+/* Set a value by path. Creates intermediate objects/arrays.
+   new_val is consumed (caller must not free it on success). */
+toon_bool toon_path_set(JsonValue *root, const char *path, JsonValue *new_val);
+
+/* Delete a value by path. Returns TRUE on success. */
+toon_bool toon_path_del(JsonValue *root, const char *path);
+
+/* Append a value to an array at path. Creates the array if needed.
+   new_val is consumed on success. */
+toon_bool toon_path_append(JsonValue *root, const char *path, JsonValue *new_val);
+
 #endif /* TOON_H */

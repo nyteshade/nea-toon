@@ -15,8 +15,8 @@
 CC = sc:c/sc
 LD = sc:c/slink
 LIBS = lib:scnb.lib lib:scmnb.lib lib:amiga.lib
-OBJS = main.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o
-SRCS = main.c toon_decode.c toon_encode.c json_parse.c json_emit.c toon_util.c
+OBJS = main.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o toon_path.o
+SRCS = main.c toon_decode.c toon_encode.c json_parse.c json_emit.c toon_util.c toon_path.c
 
 # Default: build 68020 variant
 default: toon.020
@@ -32,6 +32,7 @@ toon.000:
 	$(CC) CPU=68000 OPT STRMER OPTPEEP json_parse.c
 	$(CC) CPU=68000 OPT STRMER OPTPEEP json_emit.c
 	$(CC) CPU=68000 OPT STRMER OPTPEEP toon_util.c
+	$(CC) CPU=68000 OPT STRMER OPTPEEP toon_path.c
 	$(LD) lib:c.o $(OBJS) TO toon.000 LIB $(LIBS) NOICONS
 	-delete \#?.o quiet
 
@@ -43,6 +44,7 @@ toon.020:
 	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER json_parse.c
 	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER json_emit.c
 	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER toon_util.c
+	$(CC) CPU=68020 OPT OPTTIME OPTINLINE OPTPEEP OPTLOOP STRMER toon_path.c
 	$(LD) lib:c.o $(OBJS) TO toon.020 LIB $(LIBS) NOICONS
 	-delete \#?.o quiet
 
@@ -54,6 +56,7 @@ toon.040:
 	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_parse.c
 	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_emit.c
 	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_util.c
+	$(CC) CPU=68040 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_path.c
 	$(LD) lib:c.o $(OBJS) TO toon.040 LIB $(LIBS) NOICONS
 	-delete \#?.o quiet
 
@@ -65,6 +68,7 @@ toon.060:
 	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_parse.c
 	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER json_emit.c
 	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_util.c
+	$(CC) CPU=68060 OPT OPTTIME OPTSCHED OPTINLINE OPTPEEP OPTLOOP STRMER toon_path.c
 	$(LD) lib:c.o $(OBJS) TO toon.060 LIB $(LIBS) NOICONS
 	-delete \#?.o quiet
 
@@ -84,6 +88,7 @@ test_runner:
 	$(CC) CPU=68020 OPT OPTTIME STRMER json_parse.c
 	$(CC) CPU=68020 OPT OPTTIME STRMER json_emit.c
 	$(CC) CPU=68020 OPT OPTTIME STRMER toon_util.c
+	$(CC) CPU=68020 OPT OPTTIME STRMER toon_path.c
 	$(CC) CPU=68020 OPT OPTTIME STRMER test_runner.c
 	$(LD) lib:c.o test_runner.o toon_decode.o toon_encode.o json_parse.o json_emit.o toon_util.o TO test_runner LIB $(LIBS) NOICONS
 	-delete \#?.o quiet
