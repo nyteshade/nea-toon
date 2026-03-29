@@ -38,7 +38,7 @@ If ${toon_cpu} EQ 0
   Set toon_bin "toon.060"
 EndIf
 
-If Not Exists ${toon_bin}
+If Not Exists "${toon_bin}"
   Echo "Error: ${toon_bin} not found."
   Echo "Run Install from the toon directory."
   Skip end
@@ -46,7 +46,7 @@ EndIf
 
 ; --- Install CLI to C: ---
 Echo "Installing ${toon_bin} to C:toon..."
-Copy ${toon_bin} C:toon CLONE QUIET
+Copy "${toon_bin}" C:toon CLONE QUIET
 If Warn
   Echo "Warning: Could not copy to C:"
 Else
@@ -73,7 +73,7 @@ If ${toon_sdk} EQ 0
 EndIf
 
 ; --- Ask where to install SDK ---
-; RequestFile adds trailing colon or slash for concatenation
+; RequestFile path includes trailing : or / for direct concatenation
 RequestFile SET toon_dir TITLE "SDK Location" DRAWERSONLY NOICONS
 If Warn
   Echo "No directory selected. Skipping SDK."
