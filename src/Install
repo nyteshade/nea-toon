@@ -1,0 +1,128 @@
+; Install script for toon - TOON format tools for AmigaOS
+; Requires AmigaOS 2.0+ (requestchoice, requestfile)
+;
+; Usage: execute Install
+;
+
+; --- Welcome ---
+requestchoice >ENV:toon_rc TITLE "TOON Installer" BODY "TOON - Token-Oriented Object Notation*n*nThis will install:*n*n  - toon CLI command*n  - toon.library shared library*n  - SDK (optional: includes, fd, static lib)*n*nProceed?" GADGETS "Install|Cancel"
+IF $toon_rc EQ 0
+  echo "Installation cancelled."
+  SKIP end
+ENDIF
+
+; --- Select CPU for CLI binary ---
+requestchoice >ENV:toon_cpu TITLE "Select CPU" BODY "Choose the toon CLI binary*nfor your CPU:" GADGETS "68000 (any Amiga)|68020|68040|68060"
+IF $toon_cpu EQ 1
+  SET toon_bin toon.000
+ENDIF
+IF $toon_cpu EQ 2
+  SET toon_bin toon.020
+ENDIF
+IF $toon_cpu EQ 3
+  SET toon_bin toon.040
+ENDIF
+IF $toon_cpu EQ 0
+  SET toon_bin toon.060
+ENDIF
+IF NOT EXISTS $toon_bin
+  echo "Error: $toon_bin not found. Run Install from the toon directory."
+  SKIP end
+ENDIF
+
+; --- Install CLI to C: ---
+echo "Installing $toon_bin to C:toon..."
+copy $toon_bin C:toon CLONE QUIET
+IF WARN
+  echo "Warning: Could not copy to C: - check permissions"
+ELSE
+  echo "  C:toon installed."
+ENDIF
+
+; --- Install shared library to LIBS: ---
+echo "Installing toon.library to LIBS:..."
+IF EXISTS LIBS:toon.library
+  echo "  Replacing existing toon.library..."
+ENDIF
+copy toon.library LIBS:toon.library CLONE QUIET
+IF WARN
+  echo "Warning: Could not copy to LIBS: - check permissions"
+ELSE
+  echo "  LIBS:toon.library installed."
+ENDIF
+
+; --- Ask about SDK ---
+requestchoice >ENV:toon_sdk TITLE "Developer SDK" BODY "Install the TOON developer SDK?*n*nIncludes:*n  - C header files*n  - FD file (function descriptors)*n  - Pragma file*n  - toon.lib (static link library)*n  - toon_example (example source)" GADGETS "Yes|No"
+IF $toon_sdk EQ 0
+  echo "Skipping SDK installation."
+  SKIP done
+ENDIF
+
+; --- Ask where to install SDK ---
+requestfile >ENV:toon_sdkdir TITLE "SDK Install Location" DRAWERSONLY NOICONS
+IF WARN
+  echo "No directory selected. Skipping SDK."
+  SKIP done
+ENDIF
+
+SET toon_dest `type ENV:toon_sdkdir`
+
+; --- Create SDK directory structure ---
+echo "Installing SDK to $toon_dest..."
+
+IF NOT EXISTS $toon_dest
+  makedir $toon_dest
+ENDIF
+IF NOT EXISTS $toon_dest/include
+  makedir $toon_dest/include
+ENDIF
+IF NOT EXISTS $toon_dest/include/libraries
+  makedir $toon_dest/include/libraries
+ENDIF
+IF NOT EXISTS $toon_dest/include/proto
+  makedir $toon_dest/include/proto
+ENDIF
+IF NOT EXISTS $toon_dest/include/pragmas
+  makedir $toon_dest/include/pragmas
+ENDIF
+IF NOT EXISTS $toon_dest/include/fd
+  makedir $toon_dest/include/fd
+ENDIF
+IF NOT EXISTS $toon_dest/lib
+  makedir $toon_dest/lib
+ENDIF
+
+; --- Copy SDK files ---
+echo "  Copying header files..."
+copy sdk/include/libraries/toon.h $toon_dest/include/libraries/toon.h CLONE QUIET
+copy sdk/include/proto/toon.h $toon_dest/include/proto/toon.h CLONE QUIET
+copy sdk/include/pragmas/toon_pragmas.h $toon_dest/include/pragmas/toon_pragmas.h CLONE QUIET
+copy sdk/include/fd/toon_lib.fd $toon_dest/include/fd/toon_lib.fd CLONE QUIET
+
+echo "  Copying libraries..."
+copy toon.library $toon_dest/lib/toon.library CLONE QUIET
+copy sdk/toon.lib $toon_dest/lib/toon.lib CLONE QUIET
+
+echo "  Copying example..."
+IF NOT EXISTS $toon_dest/examples
+  makedir $toon_dest/examples
+ENDIF
+copy sdk/toon_example.c $toon_dest/examples/toon_example.c CLONE QUIET
+
+echo "  SDK installed to $toon_dest"
+
+; --- Done ---
+LAB done
+echo ""
+echo "Installation complete!"
+echo ""
+echo "Quick start:"
+echo "  toon encode file.json      Convert JSON to TOON"
+echo "  toon decode file.toon      Convert TOON to JSON"
+echo "  toon get file.toon path    Read a value"
+echo "  toon set file.toon p val   Set a value"
+echo "  toon                       Show all commands"
+
+LAB end
+; Clean up temp vars
+delete ENV:toon_rc ENV:toon_cpu ENV:toon_sdk ENV:toon_sdkdir QUIET
