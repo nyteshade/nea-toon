@@ -6,127 +6,135 @@
 
 ; --- Welcome ---
 requestchoice >ENV:toon_rc TITLE "TOON Installer" BODY "TOON v1.2*n*n  CLI, shared library, SDK" GADGETS "Install|Cancel"
-IF $toon_rc EQ 0
-  echo "Installation cancelled."
-  SKIP end
-ENDIF
+If $toon_rc EQ 0
+  Echo "Installation cancelled."
+  Skip end
+EndIf
+
+; --- Check for existing toon.library version ---
+If Exists LIBS:toon.library
+  Version >NIL: LIBS:toon.library 1 2
+  If Not Warn
+    requestchoice >ENV:toon_rc TITLE "TOON Installer" BODY "toon.library 1.2+ already installed.*nReinstall?" GADGETS "Yes|No"
+    If $toon_rc EQ 0
+      Skip clionly
+    EndIf
+  EndIf
+EndIf
 
 ; --- Select CPU for CLI binary ---
+Lab clionly
 requestchoice >ENV:toon_cpu TITLE "Select CPU" BODY "Choose the toon CLI binary*nfor your CPU:" GADGETS "68000 (any Amiga)|68020|68040|68060"
-IF $toon_cpu EQ 1
-  echo >ENV:toon_bin "toon.000"
-ENDIF
-IF $toon_cpu EQ 2
-  echo >ENV:toon_bin "toon.020"
-ENDIF
-IF $toon_cpu EQ 3
-  echo >ENV:toon_bin "toon.040"
-ENDIF
-IF $toon_cpu EQ 0
-  echo >ENV:toon_bin "toon.060"
-ENDIF
+If $toon_cpu EQ 1
+  Set toon_bin "toon.000"
+EndIf
+If $toon_cpu EQ 2
+  Set toon_bin "toon.020"
+EndIf
+If $toon_cpu EQ 3
+  Set toon_bin "toon.040"
+EndIf
+If $toon_cpu EQ 0
+  Set toon_bin "toon.060"
+EndIf
 
-IF NOT EXISTS $toon_bin
-  echo "Error: $toon_bin not found."
-  echo "Run Install from the toon directory."
-  SKIP end
-ENDIF
+If Not Exists ${toon_bin}
+  Echo "Error: ${toon_bin} not found."
+  Echo "Run Install from the toon directory."
+  Skip end
+EndIf
 
 ; --- Install CLI to C: ---
-echo "Installing $toon_bin to C:toon..."
-copy $toon_bin C:toon CLONE QUIET
-IF WARN
-  echo "Warning: Could not copy to C:"
-ELSE
-  echo "  C:toon installed."
-ENDIF
+Echo "Installing ${toon_bin} to C:toon..."
+Copy ${toon_bin} C:toon CLONE QUIET
+If Warn
+  Echo "Warning: Could not copy to C:"
+Else
+  Echo "  C:toon installed."
+EndIf
 
 ; --- Install shared library to LIBS: ---
-echo "Installing toon.library to LIBS:..."
-IF EXISTS LIBS:toon.library
-  echo "  Replacing existing toon.library..."
-ENDIF
-copy toon.library LIBS:toon.library CLONE QUIET
-IF WARN
-  echo "Warning: Could not copy to LIBS:"
-ELSE
-  echo "  LIBS:toon.library installed."
-ENDIF
+Echo "Installing toon.library to LIBS:..."
+If Exists LIBS:toon.library
+  Echo "  Replacing existing toon.library..."
+EndIf
+Copy toon.library LIBS:toon.library CLONE QUIET
+If Warn
+  Echo "Warning: Could not copy to LIBS:"
+Else
+  Echo "  LIBS:toon.library installed."
+EndIf
 
 ; --- Ask about SDK ---
 requestchoice >ENV:toon_sdk TITLE "Developer SDK" BODY "Install SDK?*n*nHeaders, FD, pragmas, toon.lib" GADGETS "Yes|No"
-IF $toon_sdk EQ 0
-  echo "Skipping SDK installation."
-  SKIP done
-ENDIF
+If $toon_sdk EQ 0
+  Echo "Skipping SDK installation."
+  Skip done
+EndIf
 
 ; --- Ask where to install SDK ---
 requestfile >ENV:toon_dest TITLE "SDK Location" DRAWERSONLY NOICONS
-IF WARN
-  echo "No directory selected. Skipping SDK."
-  SKIP done
-ENDIF
+If Warn
+  Echo "No directory selected. Skipping SDK."
+  Skip done
+EndIf
 
-; --- Create SDK directory structure ---
-echo "Installing SDK to $toon_dest..."
+; --- Create SDK directories and copy files ---
+Set toon_dir "${toon_dest}"
 
-IF NOT EXISTS "$toon_dest"
-  makedir "$toon_dest"
-ENDIF
-IF NOT EXISTS "$toon_dest/include"
-  makedir "$toon_dest/include"
-ENDIF
-IF NOT EXISTS "$toon_dest/include/libraries"
-  makedir "$toon_dest/include/libraries"
-ENDIF
-IF NOT EXISTS "$toon_dest/include/proto"
-  makedir "$toon_dest/include/proto"
-ENDIF
-IF NOT EXISTS "$toon_dest/include/pragmas"
-  makedir "$toon_dest/include/pragmas"
-ENDIF
-IF NOT EXISTS "$toon_dest/include/fd"
-  makedir "$toon_dest/include/fd"
-ENDIF
-IF NOT EXISTS "$toon_dest/lib"
-  makedir "$toon_dest/lib"
-ENDIF
+If Not Exists "${toon_dir}"
+  MakeDir "${toon_dir}"
+EndIf
 
-; --- Copy SDK files ---
-echo "  Copying header files..."
-copy sdk/include/libraries/toon.h "$toon_dest/include/libraries/" CLONE QUIET
-copy sdk/include/proto/toon.h "$toon_dest/include/proto/" CLONE QUIET
-copy sdk/include/pragmas/toon_pragmas.h "$toon_dest/include/pragmas/" CLONE QUIET
-copy sdk/include/fd/toon_lib.fd "$toon_dest/include/fd/" CLONE QUIET
+; --- includes ---
+Set toon_sub "${toon_dir}/include/libraries"
+If Not Exists "${toon_sub}"
+  MakeDir "${toon_dir}/include" "${toon_dir}/include/libraries" "${toon_dir}/include/proto" "${toon_dir}/include/pragmas" "${toon_dir}/include/fd"
+EndIf
 
-echo "  Copying libraries..."
-copy toon.library "$toon_dest/lib/" CLONE QUIET
-copy sdk/toon.lib "$toon_dest/lib/" CLONE QUIET
+Echo "  Copying headers..."
+Copy sdk/include/libraries/toon.h "${toon_dir}/include/libraries/" CLONE QUIET
+Copy sdk/include/proto/toon.h "${toon_dir}/include/proto/" CLONE QUIET
+Copy sdk/include/pragmas/toon_pragmas.h "${toon_dir}/include/pragmas/" CLONE QUIET
+Copy sdk/include/fd/toon_lib.fd "${toon_dir}/include/fd/" CLONE QUIET
 
-echo "  Copying example..."
-IF NOT EXISTS "$toon_dest/examples"
-  makedir "$toon_dest/examples"
-ENDIF
-copy sdk/toon_example.c "$toon_dest/examples/" CLONE QUIET
+; --- libs ---
+If Not Exists "${toon_dir}/lib"
+  MakeDir "${toon_dir}/lib"
+EndIf
 
-echo "  SDK installed to $toon_dest"
+Echo "  Copying libraries..."
+Copy toon.library "${toon_dir}/lib/" CLONE QUIET
+Copy sdk/toon.lib "${toon_dir}/lib/" CLONE QUIET
+
+; --- example ---
+If Not Exists "${toon_dir}/examples"
+  MakeDir "${toon_dir}/examples"
+EndIf
+
+Echo "  Copying example..."
+Copy sdk/toon_example.c "${toon_dir}/examples/" CLONE QUIET
+
+Echo "  SDK installed to ${toon_dir}"
 
 ; --- Done ---
-LAB done
-echo ""
-echo "Installation complete!"
-echo ""
-echo "Quick start:"
-echo "  toon encode file.json"
-echo "  toon decode file.toon"
-echo "  toon get file.toon path"
-echo "  toon set file.toon path val"
-echo "  toon"
+Lab done
+Echo ""
+Echo "Installation complete!"
+Echo ""
+Echo "Quick start:"
+Echo "  toon encode file.json"
+Echo "  toon decode file.toon"
+Echo "  toon get file.toon path"
+Echo "  toon set file.toon path val"
+Echo "  toon"
 
-LAB end
-; Clean up env vars
-delete ENV:toon_rc QUIET
-delete ENV:toon_cpu QUIET
-delete ENV:toon_bin QUIET
-delete ENV:toon_sdk QUIET
-delete ENV:toon_dest QUIET
+Lab end
+; Clean up
+UnSet toon_bin
+UnSet toon_dir
+UnSet toon_sub
+UnSetEnv toon_rc
+UnSetEnv toon_cpu
+UnSetEnv toon_sdk
+UnSetEnv toon_dest
