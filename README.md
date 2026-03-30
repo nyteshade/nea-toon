@@ -273,7 +273,7 @@ See [SAS-C-GUIDE.md](SAS-C-GUIDE.md) for the full cross-compilation reference.
 
 ## License
 
-MIT License. Copyright (c) 2026 Brie Brennan (nyteshade).
+MIT License. Copyright (c) 2026 Brielle Harrison (nyteshade).
 
 See [LICENSE](LICENSE) for details.
 

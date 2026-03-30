@@ -1,6 +1,6 @@
 Short:        TOON format encoder/decoder/query tool
-Uploader:     brie@toonformat.org (Brie)
-Author:       brie@toonformat.org (Brie)
+Uploader:     nyteshade@gmail.com (Brielle Harrison)
+Author:       nyteshade@gmail.com (Brielle Harrison)
 Type:         dev/misc
 Version:      1.4
 Architecture: m68k-amigaos >= 2.0.4
@@ -93,5 +93,5 @@ Copyright
 ---------
 
 TOON specification: Copyright (c) toon-format contributors, MIT license.
-This AmigaOS implementation: Copyright (c) 2026 Brie Brennan (nyteshade).
+This AmigaOS implementation: Copyright (c) 2026 Brielle Harrison (nyteshade).
 Released under the MIT license.
