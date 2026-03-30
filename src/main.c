@@ -50,6 +50,48 @@ typedef enum {
 #define json_del_path  toon_path_del
 #define json_append_path toon_path_append
 
+/* ---- Unescape CLI string value ---- */
+/*
+ * Process escape sequences in a bare string value:
+ *   \n  -> newline       \\n -> literal \n
+ *   \t  -> tab           \\t -> literal \t
+ *   \\  -> backslash
+ *   *n  -> newline (AmigaDOS convention)
+ *   *e  -> escape (0x1B, AmigaDOS)
+ *
+ * Returns a malloc'd copy. Caller must free.
+ */
+static char *unescape_cli_string(const char *s)
+{
+    size_t len = strlen(s);
+    char *out = (char *)malloc(len + 1);
+    const char *r = s;
+    char *w;
+    if (!out) return NULL;
+    w = out;
+
+    while (*r) {
+        if (*r == '\\' && *(r + 1)) {
+            switch (*(r + 1)) {
+            case 'n':  *w++ = '\n'; r += 2; break;
+            case 't':  *w++ = '\t'; r += 2; break;
+            case '\\': *w++ = '\\'; r += 2; break;
+            default:   *w++ = *r++; break;
+            }
+        } else if (*r == '*' && *(r + 1)) {
+            switch (*(r + 1)) {
+            case 'n': case 'N': *w++ = '\n'; r += 2; break;
+            case 'e': case 'E': *w++ = 0x1B; r += 2; break;
+            default:  *w++ = *r++; break;
+            }
+        } else {
+            *w++ = *r++;
+        }
+    }
+    *w = '\0';
+    return out;
+}
+
 /* ---- Parse a CLI value string into a JsonValue ---- */
 
 static JsonValue *parse_cli_value(const char *s)
@@ -84,8 +126,13 @@ static JsonValue *parse_cli_value(const char *s)
         }
     }
 
-    /* Default: string */
-    return json_new_string(s);
+    /* Default: string (with escape processing) */
+    {
+        char *unesc = unescape_cli_string(s);
+        JsonValue *v = json_new_string(unesc ? unesc : s);
+        if (unesc) free(unesc);
+        return v;
+    }
 }
 
 /* ---- Output value ---- */
@@ -157,7 +204,7 @@ static void print_value(const JsonValue *v, OutputFmt fmt,
 
 static void print_usage(void)
 {
-    printf("TOON - Token-Oriented Object Notation CLI v1.5\n");
+    printf("TOON - Token-Oriented Object Notation CLI v1.6\n");
     printf("Implements TOON Spec v3.0\n\n");
     printf("Commands:\n");
     printf("  toon encode [opts] [file]       JSON to TOON\n");
@@ -253,6 +300,11 @@ static void help_set(void)
     printf("  Null:      toon set f.toon key null\n");
     printf("  JSON:      toon set f.toon key '{\"a\":1}'\n");
     printf("  Root:      toon set f.toon . '{\"new\":\"doc\"}'\n");
+    printf("\nEscape sequences (in string values):\n");
+    printf("  \\n   newline      \\\\n  literal \\n\n");
+    printf("  \\t   tab          \\\\t  literal \\t\n");
+    printf("  *n   newline (AmigaDOS style)\n");
+    printf("  *e   escape char (0x1B)\n");
     printf("\nAppend examples:\n");
     printf("  toon set -a f.toon friends Kristin\n");
     printf("  toon set -a f.toon friends Lacy\n");

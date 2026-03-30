@@ -31,7 +31,7 @@ TO toon.library
 LIB $(LIBS)
 NOICONS SD
 DEFINE __XCEXIT=___stub
-LIBVERSION 1 LIBREVISION 5
+LIBVERSION 1 LIBREVISION 6
 <
 
 toon_lib.o: toon_lib.c //toon.h

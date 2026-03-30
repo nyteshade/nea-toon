@@ -21,7 +21,7 @@
 
 #define TOON_NAME       "toon.library"
 #define TOON_VERSION    1
-#define TOON_REVISION   5
+#define TOON_REVISION   6
 #define TOON_SPEC       "3.0"
 
 /* ---- JSON value types ---- */

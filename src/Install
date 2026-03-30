@@ -13,9 +13,9 @@ EndIf
 
 ; --- Check for existing toon.library version ---
 If Exists LIBS:toon.library
-  Version >NIL: LIBS:toon.library 1 5
+  Version >NIL: LIBS:toon.library 1 6
   If Not Warn
-    RequestChoice SET toonrc TITLE "TOON Installer" BODY "toon.library 1.5+ already installed.*nReinstall?" GADGETS "Yes|No"
+    RequestChoice SET toonrc TITLE "TOON Installer" BODY "toon.library 1.6+ already installed.*nReinstall?" GADGETS "Yes|No"
     If $toonrc EQ 0
       Skip clionly
     EndIf
@@ -66,7 +66,7 @@ Else
 EndIf
 
 ; --- Ask about SDK ---
-RequestChoice SET toonsdk TITLE "Developer SDK" BODY "Install SDK?*n*nHeaders, FD, pragmas, toon.lib" GADGETS "Yes|No"
+RequestChoice SET toonsdk TITLE "Developer SDK" BODY "Install SDK?*n*nHeaders, FD, pragmas, toon.lib*nA directory toon will be created." GADGETS "Yes|No"
 If $toonsdk EQ 0
   Echo "Skipping SDK installation."
   Skip done
@@ -81,49 +81,58 @@ If Warn
 EndIf
 
 ; --- Create SDK directories ---
+If Not Exists "$toondir"
+  MakeDir "$toondir" ICON
+EndIf
+
+Set toondir "${toondir}toon/"
+If Not Exists "${tooldir}"
+  MakeDir "${tooldir}" ALL
+EndIf
+
 Echo "Installing SDK to $toondir..."
 
-If Not Exists "$toondir"include
-  MakeDir "$toondir"include
+If Not Exists "${toondir}include"
+  MakeDir "${toondir}include" ALL
 EndIf
-If Not Exists "$toondir"include/libraries
-  MakeDir "$toondir"include/libraries
+If Not Exists "${toondir}include/libraries"
+  MakeDir "${toondir}include/libraries" ALL
 EndIf
-If Not Exists "$toondir"include/proto
-  MakeDir "$toondir"include/proto
+If Not Exists "${toondir}include/proto"
+  MakeDir "${toondir}include/proto" ALL
 EndIf
-If Not Exists "$toondir"include/pragmas
-  MakeDir "$toondir"include/pragmas
+If Not Exists "${toondir}include/pragmas"
+  MakeDir "${toondir}include/pragmas" ALL
 EndIf
-If Not Exists "$toondir"include/fd
-  MakeDir "$toondir"include/fd
+If Not Exists "${toondir}include/fd"
+  MakeDir "${toondir}include/fd" ALL
 EndIf
-If Not Exists "$toondir"lib
-  MakeDir "$toondir"lib
+If Not Exists "${toondir}lib"
+  MakeDir "${toondir}lib" ALL
 EndIf
 
 ; --- Copy SDK files ---
 Echo "  Copying headers..."
-Copy sdk/include/libraries/toon.h "$toondir"include/libraries/ CLONE QUIET
-Copy sdk/include/proto/toon.h "$toondir"include/proto/ CLONE QUIET
-Copy sdk/include/pragmas/toon_pragmas.h "$toondir"include/pragmas/ CLONE QUIET
-Copy sdk/fd/toon_lib.fd "$toondir"include/fd/ CLONE QUIET
+Copy sdk/include/libraries/toon.h "${toondir}include/libraries/" CLONE QUIET
+Copy sdk/include/proto/toon.h "${toondir}include/proto/" CLONE QUIET
+Copy sdk/include/pragmas/toon_pragmas.h "${toondir}include/pragmas/" CLONE QUIET
+Copy sdk/fd/toon_lib.fd "${toondir}include/fd/" CLONE QUIET
 
 Echo "  Copying libraries..."
-Copy Libs/toon.library "$toondir"lib/ CLONE QUIET
-Copy sdk/lib/toon.lib "$toondir"lib/ CLONE QUIET
+Copy Libs/toon.library "${toondir}lib/" CLONE QUIET
+Copy sdk/lib/toon.lib "${toondir}lib/" CLONE QUIET
 
 Echo "  Copying autodoc..."
-If Not Exists "$toondir"autodocs
-  MakeDir "$toondir"autodocs
+If Not Exists "${toondir}autodocs"
+  MakeDir "${toondir}autodocs"
 EndIf
-Copy sdk/autodocs/toon.doc "$toondir"autodocs/ CLONE QUIET
+Copy sdk/autodocs/toon.doc "${toondir}autodocs/" CLONE QUIET
 
 Echo "  Copying example..."
-If Not Exists "$toondir"examples
-  MakeDir "$toondir"examples
+If Not Exists "${toondir}examples"
+  MakeDir "${toondir}examples"
 EndIf
-Copy sdk/src/lib/toon_example.c "$toondir"examples/ CLONE QUIET
+Copy sdk/src/lib/toon_example.c "${toondir}examples/" CLONE QUIET
 
 Echo "  SDK installed to $toondir"
 
