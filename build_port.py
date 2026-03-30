@@ -1914,19 +1914,66 @@ def package_release(port_dir, spec_version, app_version, args):
     with open(os.path.join(release_dir, 'README'), 'w', newline='\n') as f:
         f.write(readme)
 
-    # Create tar.gz archive
-    archive_base = os.path.join(os.path.dirname(port_dir), 'releases', release_name)
-    archive_path = shutil.make_archive(
+    # Copy Aminet readme alongside release archives
+    releases_dir = os.path.dirname(release_dir)
+    readme_name = f"{release_name}.readme"
+    aminet_readme_src = os.path.join(os.path.dirname(port_dir),
+                                     f"toon-{app_version}.readme")
+    if not os.path.exists(aminet_readme_src):
+        # Try without minor version variants
+        for candidate in Path(os.path.dirname(port_dir)).glob('toon-*.readme'):
+            aminet_readme_src = str(candidate)
+            break
+    if os.path.exists(aminet_readme_src):
+        shutil.copy2(aminet_readme_src, os.path.join(releases_dir, readme_name))
+        print(f"  {readme_name}")
+
+    # Create archives in multiple formats
+    print()
+    print("  Archives:")
+    archives = []
+
+    # tar.gz (for GitHub / Unix)
+    archive_base = os.path.join(releases_dir, release_name)
+    tgz_path = shutil.make_archive(
         archive_base, 'gztar',
         root_dir=os.path.dirname(release_dir),
         base_dir=release_name
     )
+    archives.append(tgz_path)
+    print(f"    {os.path.basename(tgz_path)}: {os.path.getsize(tgz_path):,} bytes")
 
-    # Summary
-    archive_size = os.path.getsize(archive_path)
-    print(f"  Release directory: {release_dir}/")
-    print(f"  Archive: {archive_path} ({archive_size:,} bytes)")
+    # zip (widely supported, works on Amiga with UnZip)
+    zip_path = shutil.make_archive(
+        archive_base, 'zip',
+        root_dir=os.path.dirname(release_dir),
+        base_dir=release_name
+    )
+    archives.append(zip_path)
+    print(f"    {os.path.basename(zip_path)}: {os.path.getsize(zip_path):,} bytes")
+
+    # lha (preferred Amiga format, if lha is in PATH)
+    lha_bin = shutil.which('lha')
+    if lha_bin:
+        lha_path = os.path.join(releases_dir, f"{release_name}.lha")
+        if os.path.exists(lha_path):
+            os.unlink(lha_path)
+        import subprocess
+        result = subprocess.run(
+            [lha_bin, 'a', lha_path, release_name + '/'],
+            capture_output=True, text=True, timeout=120,
+            cwd=os.path.dirname(release_dir)
+        )
+        if os.path.exists(lha_path):
+            archives.append(lha_path)
+            print(f"    {os.path.basename(lha_path)}: {os.path.getsize(lha_path):,} bytes")
+        else:
+            print(f"    lha: FAILED ({result.stderr.strip()})")
+    else:
+        print("    lha: not found in PATH (skipped)")
+
     print()
+    print(f"  Release directory: {release_dir}/")
 
     # Print sizes
     print("  Contents:")
@@ -1967,8 +2014,10 @@ def package_release(port_dir, spec_version, app_version, args):
     print(f"    README")
 
     print()
-    print(f"Ready for GitHub release: {archive_path}")
-    print(f"  gh release create v{app_version} {archive_path} --title 'toon {app_version} for AmigaOS'")
+    archive_args = ' '.join(os.path.basename(a) for a in archives)
+    print(f"Ready for GitHub release:")
+    print(f"  cd {releases_dir}")
+    print(f"  gh release create v{app_version} {archive_args} --title 'toon {app_version} for AmigaOS'")
 
 
 # ---------------------------------------------------------------------------
