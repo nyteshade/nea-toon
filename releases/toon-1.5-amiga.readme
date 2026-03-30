@@ -1,0 +1,97 @@
+Short:        TOON format encoder/decoder/query tool
+Uploader:     nyteshade@gmail.com (Brielle Harrison)
+Author:       nyteshade@gmail.com (Brielle Harrison)
+Type:         dev/misc
+Version:      1.4
+Architecture: m68k-amigaos >= 2.0.4
+Requires:     68020+ CPU
+
+TOON - Token-Oriented Object Notation for AmigaOS
+==================================================
+
+A native AmigaOS CLI tool and shared library for reading, writing, and
+querying files in the TOON data format (Token-Oriented Object Notation).
+
+TOON is a human-readable data format that encodes the full JSON data model
+using a clean, line-oriented, indentation-based syntax. It is designed to
+be easy to read, easy to diff, and easy to edit by hand.
+
+This is a clean-room C89 implementation written from the TOON Specification
+v3.0, available at:
+
+  https://github.com/toon-format/spec
+
+Homepage:
+
+  https://github.com/nyteshade/nea-toon
+
+
+Features
+--------
+
+CLI tool with five subcommands:
+
+  toon encode <file.json>       Convert JSON to TOON
+  toon decode <file.toon>       Convert TOON to JSON
+  toon get <file> [path]        Query a value by dotted path
+  toon set <file> <path> <val>  Set a value by dotted path
+  toon del <file> <path>        Delete a value by dotted path
+
+Additional options:
+
+  -d tab|pipe        Use tab or pipe delimiters instead of comma
+  -i <n>             Set indentation width (default 2)
+  -j                 Output as JSON (for get)
+  -t                 Output as TOON (for get)
+  -c                 Output count of array/object children
+  -a                 Append value to an existing array (for set)
+  toon <cmd> --help  Per-subcommand help
+
+Shared library (toon.library) with 27 functions covering:
+
+  - Full TOON/JSON encode and decode
+  - JsonValue construction, query, and mutation
+  - Path-based get/set/delete/append
+  - String buffer utilities
+  - Memory management (all allocations freeable)
+
+
+Included in the archive
+-----------------------
+
+  toon.000          CLI binary for 68000 (no optimisation)
+  toon.020          CLI binary for 68020+ (speed-optimised)
+  toon.040          CLI binary for 68040+ (scheduled, speed-optimised)
+  toon.060          CLI binary for 68060  (scheduled, speed-optimised)
+  toon.library      Shared library (LIBS:)
+  toon.lib          Static link library for SAS/C
+  include/          Developer SDK headers (fd, proto, pragmas, libraries)
+  examples/         TOON format example files from the spec
+  Install           AmigaDOS installation script
+  test_runner       CLI test binary (spec conformance)
+  test_library      Library test binary (spec conformance + API tests)
+
+
+Requirements
+------------
+
+  - AmigaOS 2.04 or later (3.2.x recommended)
+  - 68020 or better CPU for the .020/.040/.060 binaries
+  - 68000 compatible binary provided as toon.000
+
+
+Build environment
+-----------------
+
+Cross-compiled with SAS/C 6.58 via amitools/vamos on macOS.
+Tested on Amiberry and real 68040 hardware.
+
+Source code and build scripts available at the homepage above.
+
+
+Copyright
+---------
+
+TOON specification: Copyright (c) toon-format contributors, MIT license.
+This AmigaOS implementation: Copyright (c) 2026 Brielle Harrison (nyteshade).
+Released under the MIT license.

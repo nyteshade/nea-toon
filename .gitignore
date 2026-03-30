@@ -8,6 +8,7 @@ src/toon
 src/lib/toon.library
 src/lib/toon.lib
 src/lib/toon_example
+toon-port/toon
 toon-port/toon.000
 toon-port/toon.020
 toon-port/toon.040
@@ -20,7 +21,6 @@ toon-port/lib/toon.lib
 
 # Release archives
 release/
-releases/
 
 # vamos state
 .vamos/
