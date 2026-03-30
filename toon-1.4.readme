@@ -23,7 +23,7 @@ v3.0, available at:
 
 Homepage:
 
-  https://github.com/toon-format/toon
+  https://github.com/nyteshade/nea-toon
 
 
 Features
@@ -93,4 +93,5 @@ Copyright
 ---------
 
 TOON specification: Copyright (c) toon-format contributors, MIT license.
-This AmigaOS implementation: Copyright (c) 2026 Brie. Freely distributable.
+This AmigaOS implementation: Copyright (c) 2026 Brie Brennan (nyteshade).
+Released under the MIT license.

@@ -39,7 +39,7 @@ smake
 ### Cross-Compiling with vamos
 
 ```sh
-git clone --recursive https://github.com/youruser/nea-toon.git
+git clone --recursive https://github.com/nyteshade/nea-toon.git
 cd nea-toon
 export SC=/path/to/sasc658
 
@@ -171,11 +171,11 @@ python3 build_port.py --release --with-tests
 python3 build_port.py --release --with-tests --spec-repo /path/to/spec -v
 ```
 
-The `--release` flag produces a `release/toon-X.Y-amiga.tar.gz` archive containing all four binaries, source code, SMakefile, examples, and a README. Upload directly to GitHub Releases:
+The `--release` flag produces a `releases/toon-X.Y-amiga.tar.gz` archive containing CLI binaries, toon.library, SDK, examples, and a README. Upload directly to GitHub Releases:
 
 ```sh
-gh release create v3.0 release/toon-3.0-amiga.tar.gz \
-  --title 'toon 3.0 for AmigaOS'
+gh release create v1.5 releases/toon-1.5-amiga.tar.gz \
+  --title 'toon 1.5 for AmigaOS'
 ```
 
 On a real Amiga, `smake all` builds all four CPU variants from source:
@@ -273,10 +273,13 @@ See [SAS-C-GUIDE.md](SAS-C-GUIDE.md) for the full cross-compilation reference.
 
 ## License
 
-MIT
+MIT License. Copyright (c) 2026 Brie Brennan (nyteshade).
+
+See [LICENSE](LICENSE) for details.
 
 ## Links
 
+- [This project](https://github.com/nyteshade/nea-toon)
 - [TOON Specification](https://github.com/toon-format/spec)
 - [TOON Reference Implementation (TypeScript)](https://github.com/toon-format/toon)
 - [amitools/vamos](https://github.com/cnvogelg/amitools) — AmigaOS emulator for cross-compilation

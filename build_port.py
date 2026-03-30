@@ -1906,7 +1906,7 @@ def package_release(port_dir, spec_version, app_version, args):
         More Information
         ----------------
         TOON spec: https://github.com/toon-format/spec
-        This port: https://github.com/toon-format/nea-toon
+        This port: https://github.com/nyteshade/nea-toon
 
         Released {today}
     """)
