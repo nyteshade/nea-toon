@@ -2217,6 +2217,11 @@ def build_port(args):
         print("To cross-compile:   python3 build_port.py --build")
         print("To make a release:  python3 build_port.py --release")
 
+    # Clean up Python cache
+    pycache = os.path.join(os.path.dirname(os.path.abspath(__file__)), '__pycache__')
+    if os.path.isdir(pycache):
+        shutil.rmtree(pycache)
+
 
 def main():
     parser = argparse.ArgumentParser(

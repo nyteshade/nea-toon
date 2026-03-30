@@ -3,8 +3,10 @@ sasc658
 # Build artifacts
 *.o
 *.lnk
+*.q
 src/toon
 src/lib/toon.library
+src/lib/toon.lib
 src/lib/toon_example
 toon-port/toon.000
 toon-port/toon.020
@@ -12,6 +14,11 @@ toon-port/toon.040
 toon-port/toon.060
 toon-port/toon.noopt
 toon-port/test_runner
+toon-port/test_library
+toon-port/lib/toon.library
+toon-port/lib/toon.lib
+
+# Release archives
 release/
 releases/
 
@@ -21,10 +28,6 @@ releases/
 # Python cache
 __pycache__/
 
-# SAS/C temp files
-*.q
-
 # Legacy test files
 test_hello.*
-toon-port/test_library
 spec/
