@@ -13,10 +13,16 @@ toon-port/toon.060
 toon-port/toon.noopt
 toon-port/test_runner
 release/
-!releases/
+releases/
 
 # vamos state
 .vamos/
+
+# Python cache
+__pycache__/
+
+# SAS/C temp files
+*.q
 
 # Legacy test files
 test_hello.*

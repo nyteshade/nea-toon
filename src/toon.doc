@@ -1,0 +1,887 @@
+TABLE OF CONTENTS
+
+toon.library/ToonEncode
+toon.library/ToonDecode
+toon.library/ToonDecodeValue
+toon.library/ToonEncodeValue
+toon.library/ToonGet
+toon.library/ToonSet
+toon.library/ToonDel
+toon.library/ToonNewNull
+toon.library/ToonNewBool
+toon.library/ToonNewNumber
+toon.library/ToonNewString
+toon.library/ToonNewArray
+toon.library/ToonNewObject
+toon.library/ToonArrayPush
+toon.library/ToonObjectSet
+toon.library/ToonFreeValue
+toon.library/ToonGetType
+toon.library/ToonGetString
+toon.library/ToonGetNumber
+toon.library/ToonGetBool
+toon.library/ToonArrayCount
+toon.library/ToonArrayItem
+toon.library/ToonObjectCount
+toon.library/ToonObjectKey
+toon.library/ToonObjectItem
+toon.library/ToonParseJSON
+toon.library/ToonEmitJSON
+toon.library/ToonFreeString
+toon.library/ToonVersion
+
+
+toon.library/ToonEncode                             toon.library/ToonEncode
+
+   NAME
+        ToonEncode -- convert a JSON string to TOON format
+
+   SYNOPSIS
+        toon = ToonEncode(json, indent, delimiter)
+        D0                A0    D0      D1
+
+        char *ToonEncode(const char *, int, int);
+
+   FUNCTION
+        Parses a JSON string and encodes it as TOON (Token-Oriented Object
+        Notation) text. The input must be valid JSON.
+
+   INPUTS
+        json - a NUL-terminated JSON string to convert
+        indent - number of spaces per indentation level (0 = use default 2)
+        delimiter - array delimiter style:
+                    TOON_DELIM_COMMA (0) - comma-separated (default)
+                    TOON_DELIM_TAB   (1) - tab-separated
+                    TOON_DELIM_PIPE  (2) - pipe-separated
+
+   RESULT
+        toon - a NUL-terminated string containing the TOON representation,
+               or NULL if the JSON input could not be parsed.
+               The caller must free this string with ToonFreeString().
+
+   SEE ALSO
+        ToonDecode(), ToonEncodeValue(), ToonFreeString()
+
+
+toon.library/ToonDecode                             toon.library/ToonDecode
+
+   NAME
+        ToonDecode -- convert a TOON string to JSON format
+
+   SYNOPSIS
+        json = ToonDecode(toon, indent, strict)
+        D0                A0    D0      D1
+
+        char *ToonDecode(const char *, int, int);
+
+   FUNCTION
+        Parses a TOON string and emits the equivalent JSON text.
+
+   INPUTS
+        toon - a NUL-terminated TOON string to convert
+        indent - expected indentation width (0 = use default 2)
+        strict - if non-zero, reject non-conforming input
+
+   RESULT
+        json - a NUL-terminated JSON string, or NULL on parse error.
+               The caller must free this string with ToonFreeString().
+
+   SEE ALSO
+        ToonEncode(), ToonDecodeValue(), ToonFreeString()
+
+
+toon.library/ToonDecodeValue                   toon.library/ToonDecodeValue
+
+   NAME
+        ToonDecodeValue -- decode TOON text to a JsonValue tree
+
+   SYNOPSIS
+        val = ToonDecodeValue(toon, indent, strict, err)
+        D0                    A0    D0      D1      A1
+
+        JsonValue ToonDecodeValue(const char *, int, int, const char **);
+
+   FUNCTION
+        Parses TOON text and returns a JsonValue tree that can be
+        inspected and manipulated with the ToonGetType, ToonArrayItem,
+        ToonObjectSet family of functions.
+
+   INPUTS
+        toon - a NUL-terminated TOON string
+        indent - expected indentation width (0 = use default 2)
+        strict - if non-zero, reject non-conforming input
+        err - pointer to a const char* that will receive an error message
+              on failure, or NULL if no error reporting is needed
+
+   RESULT
+        val - a JsonValue handle, or NULL on parse error.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonEncodeValue(), ToonFreeValue(), ToonGetType()
+
+
+toon.library/ToonEncodeValue                   toon.library/ToonEncodeValue
+
+   NAME
+        ToonEncodeValue -- encode a JsonValue tree as TOON text
+
+   SYNOPSIS
+        toon = ToonEncodeValue(val, indent, delimiter)
+        D0                     A0   D0      D1
+
+        char *ToonEncodeValue(JsonValue, int, int);
+
+   FUNCTION
+        Takes a JsonValue tree (constructed via ToonNewObject, ToonNewArray,
+        etc. or obtained from ToonDecodeValue/ToonParseJSON) and produces
+        the TOON text representation.
+
+   INPUTS
+        val - a JsonValue handle to encode
+        indent - number of spaces per indentation level (0 = use default 2)
+        delimiter - array delimiter style (TOON_DELIM_COMMA, etc.)
+
+   RESULT
+        toon - a NUL-terminated TOON string, or NULL on error.
+               The caller must free this string with ToonFreeString().
+
+   SEE ALSO
+        ToonDecodeValue(), ToonEncode(), ToonFreeString()
+
+
+toon.library/ToonGet                                   toon.library/ToonGet
+
+   NAME
+        ToonGet -- query a value from a TOON document by path
+
+   SYNOPSIS
+        result = ToonGet(toon, path, format)
+        D0                A0    A1    D0
+
+        char *ToonGet(const char *, const char *, int);
+
+   FUNCTION
+        Decodes a TOON document and extracts the value at the given
+        dotted path. For primitive values (null, bool, number, string),
+        returns the bare text representation. For complex values (arrays,
+        objects), the output format depends on the format argument.
+
+        The path uses dotted notation: "server.host" walks into nested
+        objects. Array indices use dotted numbers: "users.0.name".
+        A path of "." returns the root value.
+
+   INPUTS
+        toon - a NUL-terminated TOON string
+        path - a NUL-terminated dotted path string, or "." for root
+        format - output format for complex values:
+                 TOON_FMT_AUTO (0) - primitives bare, complex as TOON
+                 TOON_FMT_JSON (1) - always JSON
+                 TOON_FMT_TOON (2) - always TOON
+
+   RESULT
+        result - a NUL-terminated string containing the value, or NULL
+                 if the path was not found or the document could not be
+                 parsed. The caller must free this string with
+                 ToonFreeString().
+
+   EXAMPLE
+        /* Read a nested value */
+        result = ToonGet(toon_text, "server.host", TOON_FMT_AUTO);
+        if (result) {
+            Printf("Host: %s\n", result);
+            ToonFreeString(result);
+        }
+
+   SEE ALSO
+        ToonSet(), ToonDel(), ToonFreeString()
+
+
+toon.library/ToonSet                                   toon.library/ToonSet
+
+   NAME
+        ToonSet -- set a value in a TOON document by path
+
+   SYNOPSIS
+        result = ToonSet(toon, path, value)
+        D0                A0    A1    A2
+
+        char *ToonSet(const char *, const char *, const char *);
+
+   FUNCTION
+        Decodes a TOON document, sets the value at the given dotted path,
+        and re-encodes the result as TOON text.
+
+        The value string is auto-detected: "true"/"false" become booleans,
+        "null" becomes null, strings starting with { [ or " are parsed as
+        JSON, numeric strings become numbers, and everything else becomes
+        a string. Missing intermediate objects are created automatically.
+
+        A path of "." replaces the entire root value.
+
+   INPUTS
+        toon - a NUL-terminated TOON string
+        path - a NUL-terminated dotted path string
+        value - a NUL-terminated string representation of the new value
+
+   RESULT
+        result - a NUL-terminated TOON string containing the updated
+                 document, or NULL on error. The caller must free this
+                 string with ToonFreeString().
+
+   SEE ALSO
+        ToonGet(), ToonDel(), ToonFreeString()
+
+
+toon.library/ToonDel                                   toon.library/ToonDel
+
+   NAME
+        ToonDel -- delete a value from a TOON document by path
+
+   SYNOPSIS
+        result = ToonDel(toon, path)
+        D0                A0    A1
+
+        char *ToonDel(const char *, const char *);
+
+   FUNCTION
+        Decodes a TOON document, removes the value at the given dotted
+        path, and re-encodes the result as TOON text. For arrays,
+        deleting an element shifts subsequent elements down.
+
+   INPUTS
+        toon - a NUL-terminated TOON string
+        path - a NUL-terminated dotted path to the value to remove
+
+   RESULT
+        result - a NUL-terminated TOON string containing the updated
+                 document, or NULL if the path was not found or the
+                 document could not be parsed. The caller must free
+                 this string with ToonFreeString().
+
+   SEE ALSO
+        ToonGet(), ToonSet(), ToonFreeString()
+
+
+toon.library/ToonNewNull                           toon.library/ToonNewNull
+
+   NAME
+        ToonNewNull -- create a new JSON null value
+
+   SYNOPSIS
+        val = ToonNewNull()
+        D0
+
+        JsonValue ToonNewNull(void);
+
+   FUNCTION
+        Allocates and returns a new JsonValue representing JSON null.
+
+   INPUTS
+        None.
+
+   RESULT
+        val - a JsonValue handle, or NULL if memory allocation failed.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonNewBool(), ToonNewNumber(), ToonNewString(), ToonFreeValue()
+
+
+toon.library/ToonNewBool                           toon.library/ToonNewBool
+
+   NAME
+        ToonNewBool -- create a new JSON boolean value
+
+   SYNOPSIS
+        val = ToonNewBool(bval)
+        D0                D0
+
+        JsonValue ToonNewBool(int);
+
+   FUNCTION
+        Allocates and returns a new JsonValue representing a JSON boolean.
+
+   INPUTS
+        bval - boolean value: 0 for false, non-zero for true
+
+   RESULT
+        val - a JsonValue handle, or NULL if memory allocation failed.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonGetBool(), ToonNewNull(), ToonFreeValue()
+
+
+toon.library/ToonNewNumber                       toon.library/ToonNewNumber
+
+   NAME
+        ToonNewNumber -- create a new JSON number value
+
+   SYNOPSIS
+        val = ToonNewNumber(valptr)
+        D0                  A0
+
+        JsonValue ToonNewNumber(double *);
+
+   FUNCTION
+        Allocates and returns a new JsonValue representing a JSON number.
+        The number is passed as a pointer to a double because 68K register
+        calling conventions cannot pass doubles in address or data
+        registers.
+
+   INPUTS
+        valptr - pointer to a double containing the numeric value
+
+   RESULT
+        val - a JsonValue handle, or NULL if memory allocation failed.
+              The caller must free this value with ToonFreeValue().
+
+   NOTES
+        Numbers are stored as IEEE 754 double-precision floats (64-bit).
+        Integer values up to 2^53 are represented exactly.
+
+   SEE ALSO
+        ToonGetNumber(), ToonNewNull(), ToonFreeValue()
+
+
+toon.library/ToonNewString                       toon.library/ToonNewString
+
+   NAME
+        ToonNewString -- create a new JSON string value
+
+   SYNOPSIS
+        val = ToonNewString(s)
+        D0                  A0
+
+        JsonValue ToonNewString(const char *);
+
+   FUNCTION
+        Allocates and returns a new JsonValue representing a JSON string.
+        The input string is copied; the caller retains ownership of the
+        original.
+
+   INPUTS
+        s - a NUL-terminated string to use as the value
+
+   RESULT
+        val - a JsonValue handle, or NULL if memory allocation failed.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonGetString(), ToonNewNull(), ToonFreeValue()
+
+
+toon.library/ToonNewArray                         toon.library/ToonNewArray
+
+   NAME
+        ToonNewArray -- create a new empty JSON array
+
+   SYNOPSIS
+        val = ToonNewArray()
+        D0
+
+        JsonValue ToonNewArray(void);
+
+   FUNCTION
+        Allocates and returns a new JsonValue representing an empty
+        JSON array. Elements can be added with ToonArrayPush().
+
+   INPUTS
+        None.
+
+   RESULT
+        val - a JsonValue handle, or NULL if memory allocation failed.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonArrayPush(), ToonArrayCount(), ToonArrayItem(),
+        ToonFreeValue()
+
+
+toon.library/ToonNewObject                       toon.library/ToonNewObject
+
+   NAME
+        ToonNewObject -- create a new empty JSON object
+
+   SYNOPSIS
+        val = ToonNewObject()
+        D0
+
+        JsonValue ToonNewObject(void);
+
+   FUNCTION
+        Allocates and returns a new JsonValue representing an empty
+        JSON object. Key-value pairs can be added with ToonObjectSet().
+
+   INPUTS
+        None.
+
+   RESULT
+        val - a JsonValue handle, or NULL if memory allocation failed.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonObjectSet(), ToonObjectCount(), ToonObjectKey(),
+        ToonObjectItem(), ToonFreeValue()
+
+
+toon.library/ToonArrayPush                       toon.library/ToonArrayPush
+
+   NAME
+        ToonArrayPush -- append an element to a JSON array
+
+   SYNOPSIS
+        ToonArrayPush(arr, item)
+                      A0   A1
+
+        void ToonArrayPush(JsonValue, JsonValue);
+
+   FUNCTION
+        Appends the given JsonValue to the end of the array. After this
+        call, the array owns the item; do not free it separately.
+
+   INPUTS
+        arr - a JsonValue of type TOON_TYPE_ARRAY
+        item - a JsonValue to append (ownership transfers to the array)
+
+   RESULT
+        None.
+
+   NOTES
+        If arr is not an array, this function does nothing.
+
+   SEE ALSO
+        ToonNewArray(), ToonArrayCount(), ToonArrayItem()
+
+
+toon.library/ToonObjectSet                       toon.library/ToonObjectSet
+
+   NAME
+        ToonObjectSet -- set a key-value pair in a JSON object
+
+   SYNOPSIS
+        ToonObjectSet(obj, key, val)
+                      A0   A1   A2
+
+        void ToonObjectSet(JsonValue, const char *, JsonValue);
+
+   FUNCTION
+        Sets or replaces the value associated with the given key in the
+        object. The key string is copied. The value's ownership transfers
+        to the object. If the key already exists, the previous value is
+        freed and replaced.
+
+   INPUTS
+        obj - a JsonValue of type TOON_TYPE_OBJECT
+        key - a NUL-terminated key string (will be copied)
+        val - a JsonValue to associate with the key (ownership transfers
+              to the object)
+
+   RESULT
+        None.
+
+   SEE ALSO
+        ToonNewObject(), ToonObjectCount(), ToonObjectKey(),
+        ToonObjectItem()
+
+
+toon.library/ToonFreeValue                       toon.library/ToonFreeValue
+
+   NAME
+        ToonFreeValue -- free a JsonValue tree
+
+   SYNOPSIS
+        ToonFreeValue(val)
+                      A0
+
+        void ToonFreeValue(JsonValue);
+
+   FUNCTION
+        Recursively frees a JsonValue and all its children. After this
+        call, the handle is invalid and must not be used.
+
+        For arrays, all contained elements are freed. For objects, all
+        keys and values are freed.
+
+   INPUTS
+        val - a JsonValue handle to free, or NULL (safe to call with NULL)
+
+   RESULT
+        None.
+
+   SEE ALSO
+        ToonNewNull(), ToonNewArray(), ToonNewObject(), ToonFreeString()
+
+
+toon.library/ToonGetType                           toon.library/ToonGetType
+
+   NAME
+        ToonGetType -- query the type of a JsonValue
+
+   SYNOPSIS
+        type = ToonGetType(val)
+        D0                 A0
+
+        int ToonGetType(JsonValue);
+
+   FUNCTION
+        Returns an integer indicating the JSON type of the given value.
+
+   INPUTS
+        val - a JsonValue handle
+
+   RESULT
+        type - one of:
+               TOON_TYPE_NULL   (0) - JSON null
+               TOON_TYPE_BOOL   (1) - JSON boolean
+               TOON_TYPE_NUMBER (2) - JSON number
+               TOON_TYPE_STRING (3) - JSON string
+               TOON_TYPE_ARRAY  (4) - JSON array
+               TOON_TYPE_OBJECT (5) - JSON object
+
+               Returns TOON_TYPE_NULL if val is NULL.
+
+   SEE ALSO
+        ToonGetString(), ToonGetNumber(), ToonGetBool()
+
+
+toon.library/ToonGetString                       toon.library/ToonGetString
+
+   NAME
+        ToonGetString -- get the string value from a JsonValue
+
+   SYNOPSIS
+        s = ToonGetString(val)
+        D0                A0
+
+        const char *ToonGetString(JsonValue);
+
+   FUNCTION
+        Returns a pointer to the internal string data of a string-type
+        JsonValue. The returned pointer is valid for the lifetime of the
+        JsonValue. Do not free it; it is freed when ToonFreeValue() is
+        called on the owning value.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_STRING
+
+   RESULT
+        s - a pointer to the NUL-terminated string, or NULL if val is
+            not a string type.
+
+   NOTES
+        The returned pointer becomes invalid after ToonFreeValue(val).
+        Copy the string if you need it to persist.
+
+   SEE ALSO
+        ToonNewString(), ToonGetType()
+
+
+toon.library/ToonGetNumber                       toon.library/ToonGetNumber
+
+   NAME
+        ToonGetNumber -- get the numeric value from a JsonValue
+
+   SYNOPSIS
+        ok = ToonGetNumber(val, result)
+        D0                 A0   A1
+
+        int ToonGetNumber(JsonValue, double *);
+
+   FUNCTION
+        Retrieves the numeric value of a number-type JsonValue and stores
+        it in the double pointed to by result. Returns a boolean indicating
+        success.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_NUMBER
+        result - pointer to a double to receive the value
+
+   RESULT
+        ok - TRUE (non-zero) if val was a number and result was filled,
+             FALSE (zero) if val is not a number type.
+
+   SEE ALSO
+        ToonNewNumber(), ToonGetType()
+
+
+toon.library/ToonGetBool                           toon.library/ToonGetBool
+
+   NAME
+        ToonGetBool -- get the boolean value from a JsonValue
+
+   SYNOPSIS
+        bval = ToonGetBool(val)
+        D0                 A0
+
+        int ToonGetBool(JsonValue);
+
+   FUNCTION
+        Returns the boolean value of a bool-type JsonValue.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_BOOL
+
+   RESULT
+        bval - TRUE (non-zero) for JSON true, FALSE (zero) for JSON false.
+               Returns FALSE if val is not a boolean type.
+
+   SEE ALSO
+        ToonNewBool(), ToonGetType()
+
+
+toon.library/ToonArrayCount                     toon.library/ToonArrayCount
+
+   NAME
+        ToonArrayCount -- get the number of elements in a JSON array
+
+   SYNOPSIS
+        count = ToonArrayCount(val)
+        D0                     A0
+
+        int ToonArrayCount(JsonValue);
+
+   FUNCTION
+        Returns the number of elements in an array-type JsonValue.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_ARRAY
+
+   RESULT
+        count - the number of elements, or 0 if val is not an array.
+
+   SEE ALSO
+        ToonArrayItem(), ToonArrayPush(), ToonNewArray()
+
+
+toon.library/ToonArrayItem                       toon.library/ToonArrayItem
+
+   NAME
+        ToonArrayItem -- get an element from a JSON array by index
+
+   SYNOPSIS
+        item = ToonArrayItem(val, index)
+        D0                   A0   D0
+
+        JsonValue ToonArrayItem(JsonValue, int);
+
+   FUNCTION
+        Returns the JsonValue at the given index in an array. The returned
+        value is owned by the array; do not free it directly.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_ARRAY
+        index - zero-based element index
+
+   RESULT
+        item - the JsonValue at that index, or NULL if val is not an
+               array or index is out of bounds.
+
+   NOTES
+        The returned handle is owned by the parent array. Do not call
+        ToonFreeValue() on it. It becomes invalid when the parent is
+        freed.
+
+   SEE ALSO
+        ToonArrayCount(), ToonArrayPush(), ToonNewArray()
+
+
+toon.library/ToonObjectCount                   toon.library/ToonObjectCount
+
+   NAME
+        ToonObjectCount -- get the number of key-value pairs in a JSON
+        object
+
+   SYNOPSIS
+        count = ToonObjectCount(val)
+        D0                      A0
+
+        int ToonObjectCount(JsonValue);
+
+   FUNCTION
+        Returns the number of key-value pairs in an object-type JsonValue.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_OBJECT
+
+   RESULT
+        count - the number of pairs, or 0 if val is not an object.
+
+   SEE ALSO
+        ToonObjectKey(), ToonObjectItem(), ToonObjectSet(), ToonNewObject()
+
+
+toon.library/ToonObjectKey                       toon.library/ToonObjectKey
+
+   NAME
+        ToonObjectKey -- get a key from a JSON object by index
+
+   SYNOPSIS
+        key = ToonObjectKey(val, index)
+        D0                  A0   D0
+
+        const char *ToonObjectKey(JsonValue, int);
+
+   FUNCTION
+        Returns a pointer to the key string at the given index in an
+        object. Keys are stored in insertion order.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_OBJECT
+        index - zero-based pair index
+
+   RESULT
+        key - a pointer to the NUL-terminated key string, or NULL if
+              val is not an object or index is out of bounds.
+
+   NOTES
+        The returned pointer is owned by the object. It becomes invalid
+        when the parent is freed or the key is replaced.
+
+   SEE ALSO
+        ToonObjectItem(), ToonObjectCount(), ToonObjectSet()
+
+
+toon.library/ToonObjectItem                     toon.library/ToonObjectItem
+
+   NAME
+        ToonObjectItem -- get a value from a JSON object by index
+
+   SYNOPSIS
+        item = ToonObjectItem(val, index)
+        D0                    A0   D0
+
+        JsonValue ToonObjectItem(JsonValue, int);
+
+   FUNCTION
+        Returns the JsonValue associated with the key at the given index
+        in an object. Pairs are stored in insertion order.
+
+   INPUTS
+        val - a JsonValue of type TOON_TYPE_OBJECT
+        index - zero-based pair index
+
+   RESULT
+        item - the JsonValue at that index, or NULL if val is not an
+               object or index is out of bounds.
+
+   NOTES
+        The returned handle is owned by the parent object. Do not call
+        ToonFreeValue() on it.
+
+   SEE ALSO
+        ToonObjectKey(), ToonObjectCount(), ToonObjectSet()
+
+
+toon.library/ToonParseJSON                       toon.library/ToonParseJSON
+
+   NAME
+        ToonParseJSON -- parse a JSON string into a JsonValue tree
+
+   SYNOPSIS
+        val = ToonParseJSON(json, err)
+        D0                  A0    A1
+
+        JsonValue ToonParseJSON(const char *, const char **);
+
+   FUNCTION
+        Parses a NUL-terminated JSON string and returns a JsonValue tree.
+        This is the JSON equivalent of ToonDecodeValue for TOON text.
+
+   INPUTS
+        json - a NUL-terminated JSON string
+        err - pointer to a const char* that will receive an error message
+              on failure, or NULL if no error reporting is needed
+
+   RESULT
+        val - a JsonValue handle, or NULL on parse error.
+              The caller must free this value with ToonFreeValue().
+
+   SEE ALSO
+        ToonEmitJSON(), ToonDecodeValue(), ToonFreeValue()
+
+
+toon.library/ToonEmitJSON                         toon.library/ToonEmitJSON
+
+   NAME
+        ToonEmitJSON -- convert a JsonValue tree to a JSON string
+
+   SYNOPSIS
+        json = ToonEmitJSON(val)
+        D0                  A0
+
+        char *ToonEmitJSON(JsonValue);
+
+   FUNCTION
+        Takes a JsonValue tree and produces a compact JSON string
+        representation.
+
+   INPUTS
+        val - a JsonValue handle to emit
+
+   RESULT
+        json - a NUL-terminated JSON string, or NULL on error.
+               The caller must free this string with ToonFreeString().
+
+   SEE ALSO
+        ToonParseJSON(), ToonEncodeValue(), ToonFreeString()
+
+
+toon.library/ToonFreeString                     toon.library/ToonFreeString
+
+   NAME
+        ToonFreeString -- free a string returned by the library
+
+   SYNOPSIS
+        ToonFreeString(s)
+                       A0
+
+        void ToonFreeString(char *);
+
+   FUNCTION
+        Frees a NUL-terminated string that was returned by any of the
+        library's text-returning functions (ToonEncode, ToonDecode,
+        ToonGet, ToonSet, ToonDel, ToonEncodeValue, ToonEmitJSON).
+
+        It is safe to call with NULL.
+
+   INPUTS
+        s - a string previously returned by the library, or NULL
+
+   RESULT
+        None.
+
+   NOTES
+        Do not use C library free() on strings returned by toon.library,
+        as the library may use a different memory allocator in future
+        versions. Always use ToonFreeString().
+
+   SEE ALSO
+        ToonFreeValue(), ToonEncode(), ToonGet()
+
+
+toon.library/ToonVersion                           toon.library/ToonVersion
+
+   NAME
+        ToonVersion -- query the supported TOON specification version
+
+   SYNOPSIS
+        version = ToonVersion()
+        D0
+
+        int ToonVersion(void);
+
+   FUNCTION
+        Returns the TOON specification version that this library
+        implements, encoded as major*100 + minor. For example,
+        spec version 3.0 returns 300.
+
+   INPUTS
+        None.
+
+   RESULT
+        version - the spec version as an integer (e.g. 300 for v3.0)
+
+   SEE ALSO
+        ToonEncode(), ToonDecode()

@@ -157,7 +157,7 @@ static void print_value(const JsonValue *v, OutputFmt fmt,
 
 static void print_usage(void)
 {
-    printf("TOON - Token-Oriented Object Notation CLI v1.4\n");
+    printf("TOON - Token-Oriented Object Notation CLI v1.5\n");
     printf("Implements TOON Spec v3.0\n\n");
     printf("Commands:\n");
     printf("  toon encode [opts] [file]       JSON to TOON\n");

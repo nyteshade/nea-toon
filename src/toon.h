@@ -14,7 +14,7 @@
 
 /* SAS/C compatibility */
 #ifdef __SASC
-static const char amiga_ver[] = "$VER: toon 1.4 (29.3.2026)";
+static const char amiga_ver[] = "$VER: toon 1.5 (29.3.2026)";
 #define inline __inline
 #endif
 
