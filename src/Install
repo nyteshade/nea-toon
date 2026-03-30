@@ -5,8 +5,8 @@
 ;
 
 ; --- Welcome ---
-RequestChoice SET toon_rc TITLE "TOON Installer" BODY "TOON v1.5*n*n  CLI, shared library, SDK" GADGETS "Install|Cancel"
-If ${toon_rc} EQ 0
+RequestChoice SET toonrc TITLE "TOON Installer" BODY "TOON v1.5*n*n  CLI, shared library, SDK" GADGETS "Install|Cancel"
+If $toonrc EQ 0
   Echo "Installation cancelled."
   Skip end
 EndIf
@@ -15,8 +15,8 @@ EndIf
 If Exists LIBS:toon.library
   Version >NIL: LIBS:toon.library 1 5
   If Not Warn
-    RequestChoice SET toon_rc TITLE "TOON Installer" BODY "toon.library 1.5+ already installed.*nReinstall?" GADGETS "Yes|No"
-    If ${toon_rc} EQ 0
+    RequestChoice SET toonrc TITLE "TOON Installer" BODY "toon.library 1.5+ already installed.*nReinstall?" GADGETS "Yes|No"
+    If $toonrc EQ 0
       Skip clionly
     EndIf
   EndIf
@@ -24,29 +24,29 @@ EndIf
 
 ; --- Select CPU for CLI binary ---
 Lab clionly
-RequestChoice SET toon_cpu TITLE "Select CPU" BODY "Choose the toon CLI binary*nfor your CPU:" GADGETS "68000 (any Amiga)|68020|68040|68060"
-If ${toon_cpu} EQ 1
-  Set toon_bin "toon.000"
+RequestChoice SET tooncpu TITLE "Select CPU" BODY "Choose the toon CLI binary*nfor your CPU:" GADGETS "68000 (any Amiga)|68020|68040|68060"
+If $tooncpu EQ 1
+  Set toonbin "C/toon.000"
 EndIf
-If ${toon_cpu} EQ 2
-  Set toon_bin "toon.020"
+If $tooncpu EQ 2
+  Set toonbin "C/toon.020"
 EndIf
-If ${toon_cpu} EQ 3
-  Set toon_bin "toon.040"
+If $tooncpu EQ 3
+  Set toonbin "C/toon.040"
 EndIf
-If ${toon_cpu} EQ 0
-  Set toon_bin "toon.060"
+If $tooncpu EQ 0
+  Set toonbin "C/toon.060"
 EndIf
 
-If Not Exists "${toon_bin}"
-  Echo "Error: ${toon_bin} not found."
-  Echo "Run Install from the toon directory."
+If Not Exists "$toonbin"
+  Echo "Error: $toonbin not found."
+  Echo "Run Install from the toon release directory."
   Skip end
 EndIf
 
 ; --- Install CLI to C: ---
-Echo "Installing ${toon_bin} to C:toon..."
-Copy "${toon_bin}" C:toon CLONE QUIET
+Echo "Installing $toonbin to C:toon..."
+Copy "$toonbin" C:toon CLONE QUIET
 If Warn
   Echo "Warning: Could not copy to C:"
 Else
@@ -58,7 +58,7 @@ Echo "Installing toon.library to LIBS:..."
 If Exists LIBS:toon.library
   Echo "  Replacing existing toon.library..."
 EndIf
-Copy toon.library LIBS:toon.library CLONE QUIET
+Copy Libs/toon.library LIBS:toon.library CLONE QUIET
 If Warn
   Echo "Warning: Could not copy to LIBS:"
 Else
@@ -66,60 +66,66 @@ Else
 EndIf
 
 ; --- Ask about SDK ---
-RequestChoice SET toon_sdk TITLE "Developer SDK" BODY "Install SDK?*n*nHeaders, FD, pragmas, toon.lib" GADGETS "Yes|No"
-If ${toon_sdk} EQ 0
+RequestChoice SET toonsdk TITLE "Developer SDK" BODY "Install SDK?*n*nHeaders, FD, pragmas, toon.lib" GADGETS "Yes|No"
+If $toonsdk EQ 0
   Echo "Skipping SDK installation."
   Skip done
 EndIf
 
 ; --- Ask where to install SDK ---
 ; RequestFile path includes trailing : or / for direct concatenation
-RequestFile SET toon_dir TITLE "SDK Location" DRAWERSONLY NOICONS
+RequestFile SET toondir TITLE "SDK Location" DRAWERSONLY NOICONS
 If Warn
   Echo "No directory selected. Skipping SDK."
   Skip done
 EndIf
 
 ; --- Create SDK directories ---
-Echo "Installing SDK to ${toon_dir}..."
+Echo "Installing SDK to $toondir..."
 
-If Not Exists "${toon_dir}include"
-  MakeDir "${toon_dir}include"
+If Not Exists "$toondir"include
+  MakeDir "$toondir"include
 EndIf
-If Not Exists "${toon_dir}include/libraries"
-  MakeDir "${toon_dir}include/libraries"
+If Not Exists "$toondir"include/libraries
+  MakeDir "$toondir"include/libraries
 EndIf
-If Not Exists "${toon_dir}include/proto"
-  MakeDir "${toon_dir}include/proto"
+If Not Exists "$toondir"include/proto
+  MakeDir "$toondir"include/proto
 EndIf
-If Not Exists "${toon_dir}include/pragmas"
-  MakeDir "${toon_dir}include/pragmas"
+If Not Exists "$toondir"include/pragmas
+  MakeDir "$toondir"include/pragmas
 EndIf
-If Not Exists "${toon_dir}include/fd"
-  MakeDir "${toon_dir}include/fd"
+If Not Exists "$toondir"include/fd
+  MakeDir "$toondir"include/fd
 EndIf
-If Not Exists "${toon_dir}lib"
-  MakeDir "${toon_dir}lib"
+If Not Exists "$toondir"lib
+  MakeDir "$toondir"lib
 EndIf
 
 ; --- Copy SDK files ---
 Echo "  Copying headers..."
-Copy sdk/include/libraries/toon.h "${toon_dir}include/libraries/" CLONE QUIET
-Copy sdk/include/proto/toon.h "${toon_dir}include/proto/" CLONE QUIET
-Copy sdk/include/pragmas/toon_pragmas.h "${toon_dir}include/pragmas/" CLONE QUIET
-Copy sdk/include/fd/toon_lib.fd "${toon_dir}include/fd/" CLONE QUIET
+Copy sdk/include/libraries/toon.h "$toondir"include/libraries/ CLONE QUIET
+Copy sdk/include/proto/toon.h "$toondir"include/proto/ CLONE QUIET
+Copy sdk/include/pragmas/toon_pragmas.h "$toondir"include/pragmas/ CLONE QUIET
+Copy sdk/fd/toon_lib.fd "$toondir"include/fd/ CLONE QUIET
 
 Echo "  Copying libraries..."
-Copy toon.library "${toon_dir}lib/" CLONE QUIET
-Copy sdk/toon.lib "${toon_dir}lib/" CLONE QUIET
+Copy Libs/toon.library "$toondir"lib/ CLONE QUIET
+Copy sdk/lib/toon.lib "$toondir"lib/ CLONE QUIET
+
+Echo "  Copying autodoc..."
+If Not Exists "$toondir"autodocs
+  MakeDir "$toondir"autodocs
+EndIf
+Copy sdk/autodocs/toon.doc "$toondir"autodocs/ CLONE QUIET
 
 Echo "  Copying example..."
-If Not Exists "${toon_dir}examples"
-  MakeDir "${toon_dir}examples"
+If Not Exists "$toondir"examples
+  MakeDir "$toondir"examples
 EndIf
-Copy sdk/toon_example.c "${toon_dir}examples/" CLONE QUIET
+Copy sdk/src/lib/toon_example.c "$toondir"examples/ CLONE QUIET
 
-Echo "  SDK installed to ${toon_dir}"
+Echo "  SDK installed to $toondir"
 
 ; --- Done ---
 Lab done
@@ -135,8 +141,8 @@ Echo "  toon"
 
 Lab end
 ; Clean up
-UnSet toon_bin
-UnSet toon_dir
-UnSet toon_rc
-UnSet toon_cpu
-UnSet toon_sdk
+UnSet toonbin
+UnSet toondir
+UnSet toonrc
+UnSet tooncpu
+UnSet toonsdk
