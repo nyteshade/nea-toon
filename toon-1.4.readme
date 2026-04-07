@@ -2,9 +2,10 @@ Short:        TOON format encoder/decoder/query tool
 Uploader:     nyteshade@gmail.com (Brielle Harrison)
 Author:       nyteshade@gmail.com (Brielle Harrison)
 Type:         dev/misc
-Version:      1.4
+Version:      1.7
+Replaces:     dev/misc/toon-1.6-amiga.lha
 Architecture: m68k-amigaos >= 2.0.4
-Requires:     68020+ CPU
+URL:          https://github.com/nyteshade/nea-toon
 
 TOON - Token-Oriented Object Notation for AmigaOS
 ==================================================
